@@ -19,19 +19,19 @@ pub type Vetor {
 pub type Estado {
   // Abertura
   Menu  
-  Lobby(eu_pronto: Bool, oponente_pronto: Bool)
+  Lobby(jogador1_pronto: Bool, jogador2_pronto: Bool)
   Contagem(segundos: Int)
   // Partida
   Jogando(partida: Partida)
   Pausado(partida: Partida)
   // Resultado
-  FimDeJogo(pontos_eu: Int, pontos_oponente: Int)
+  FimDeJogo(pontos_jogador1: Int, pontos_jogador2: Int)
 }
 
 pub type Partida {
   Partida(
-    eu: Jogador,
-    oponente: Jogador,
+    jogador1: Jogador,
+    jogador2: Jogador,
     objetos: List(Objeto),
     tiros: List(Tiro),
   )
@@ -108,9 +108,29 @@ pub fn move_wasd(q: Jogador, tecla: key.Event) -> Jogador {
 
 // recebe a Partida inteira, que é o estado do world
 pub fn tecla(p: Partida, evento: key.Event) -> Partida {
+
+  Partida(..p,  jogador1: move_wasd(p.jogador1, evento),  jogador2: move(p.jogador2, evento),)
+  
+}
+
+
+/// Estado inicial do Game:
+
+fn inicial() -> Partida {
   Partida(
-    ..p,
-    eu: move_wasd(p.eu, evento),
-    oponente: move(p.oponente, evento),
+    jogador1: Jogador(250, 300, 100, 0, False),
+    jogador2: Jogador(550, 300, 100, 0, False),
+    objetos: [],
+    tiros: [],
+  )
+}
+
+fn desenhar(p: Partida) -> image.Image {
+  image.rectangle(largura_tela, altura_tela, fill.black)
+  |> image.place_image(p.jogador1.x, p.jogador1.y, image.triangle(40, fill.blue))
+  |> image.place_image(
+    p.jogador2.x,
+    p.jogador2.y,
+    image.triangle(40, fill.red),
   )
 }
