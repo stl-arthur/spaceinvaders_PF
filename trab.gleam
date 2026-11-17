@@ -17,14 +17,14 @@ pub type Vetor {
 }
 
 pub type Estado {
-  // Abertura
+
   Menu  
   Lobby(jogador1_pronto: Bool, jogador2_pronto: Bool)
   Contagem(segundos: Int)
-  // Partida
+
   Jogando(partida: Partida)
   Pausado(partida: Partida)
-  // Resultado
+
   FimDeJogo(pontos_jogador1: Int, pontos_jogador2: Int)
 }
 
@@ -41,9 +41,13 @@ pub type Jogador {
   Jogador(x: Int, y: Int, vida: Int, pontos: Int, sob_efeito: Bool)
 }
 
+
+pub type Inimigo {
+
+    
+}
 pub type TipoObjeto {
-  Geodo
-  Destroco
+ 
   Inimigo
   OrbVerde
   OrbVermelho
@@ -110,7 +114,7 @@ pub fn move_wasd(q: Jogador, tecla: key.Event) -> Jogador {
 pub fn tecla(p: Partida, evento: key.Event) -> Partida {
 
   Partida(..p,  jogador1: move_wasd(p.jogador1, evento),  jogador2: move(p.jogador2, evento),)
-  
+
 }
 
 
@@ -126,11 +130,13 @@ fn inicial() -> Partida {
 }
 
 fn desenhar(p: Partida) -> image.Image {
+
   image.rectangle(largura_tela, altura_tela, fill.black)
   |> image.place_image(p.jogador1.x, p.jogador1.y, image.triangle(40, fill.blue))
   |> image.place_image(
     p.jogador2.x,
     p.jogador2.y,
     image.triangle(40, fill.red),
+
   )
 }
