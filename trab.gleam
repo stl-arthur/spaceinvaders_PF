@@ -5,36 +5,32 @@ import sgleam/world
 const largura_tela = 800
 const altura_tela = 600
 const deslocamento = 5
-const q_x = 0
-const q_y = -300
+const q_x = 400
+const q_y = 300
 
 pub type Vetor {
   Vetor(x: Float, y: Float)
 }
 
 pub type Estado {
-  // Abertura
-  Menu  
-  Lobby(eu_pronto: Bool, oponente_pronto: Bool)
-  Contagem(segundos: Int)
+  // Abertura 
+  Lobby(jogadores: List(Player), segundos: Option(Int))
   // Partida
-  Jogando(partida: Partida)
-  Pausado(partida: Partida)
+  Jogando(campos: List(Jogador), tique: Int, seed: Int)
   // Resultado
-  FimDeJogo(pontos_eu: Int, pontos_oponente: Int)
-}
-
-pub type Partida {
-  Partida(
-    eu: Jogador,
-    oponente: Jogador,
-    objetos: List(Objeto),
-    tiros: List(Tiro),
-  )
+  FimDeJogo(status: List(Jogador))
 }
 
 pub type Jogador {
-  Jogador(pos: Vetor, vida: Int, pontos: Int, sob_efeito: Bool)
+  Campo(
+    jogador: Player,
+    pos: Vetor,
+    vida: Int,
+    pontos: Int,
+    recarga: Int,
+    objetos: List(TipoObjeto),
+    tiros: List(Tiro),
+  )
 }
 
 pub type TipoObjeto {
@@ -53,7 +49,7 @@ pub type Tiro {
   Tiro(pos: Vetor, vel: Vetor)
 }
 
-/// Teste ovni
+// Teste ovni
 
 
 fn cena_ovni(tick: Int) -> image.Image {
@@ -67,11 +63,11 @@ pub fn smain() {
   world.animation(cena_ovni)
 }
 
-/// quadrado do fundo do game teste
+// quadrado do fundo do game teste
 image.rectangle(800, 600, fill.black)
 
 
-/// jogador 1 e 2.
+// jogador 1 e 2.
 
 
 image.rectangle(800, 600, fill.black)
