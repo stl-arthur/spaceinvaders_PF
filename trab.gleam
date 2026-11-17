@@ -1,6 +1,16 @@
-    import sgleam/fill
+import sgleam/fill
 import sgleam/image
 import sgleam/world
+import gleam/int 
+import sgleam/key
+
+
+
+const largura_tela = 800
+const altura_tela = 600
+const deslocamento = 5
+const q_x = 0
+const q_y = -300
 
 pub type Vetor {
   Vetor(x: Float, y: Float)
@@ -28,7 +38,7 @@ pub type Partida {
 }
 
 pub type Jogador {
-  Jogador(pos: Vetor, vida: Int, pontos: Int, sob_efeito: Bool)
+  Jogador(x: Int, y: Int, vida: Int, pontos: Int, sob_efeito: Bool)
 }
 
 pub type TipoObjeto {
@@ -71,3 +81,36 @@ image.rectangle(800, 600, fill.black)
 image.rectangle(800, 600, fill.black)
 |> image.place_image(250, 300, image.triangle(40, fill.blue))
 |> image.place_image(550, 300, image.triangle(40, fill.red))
+
+
+
+// jogador 2: setas (a sua move, com cima e baixo)
+pub fn move(q: Jogador, tecla: key.Event) -> Jogador {
+  case tecla {
+    key.ArrowLeft -> Jogador(..q, x: q.x - deslocamento)
+    key.ArrowRight -> Jogador(..q, x: q.x + deslocamento)
+    key.ArrowUp -> Jogador(..q, y: q.y - deslocamento)
+    key.ArrowDown -> Jogador(..q, y: q.y + deslocamento)
+    _ -> q
+  }
+}
+
+// jogador 1: WASD
+pub fn move_wasd(q: Jogador, tecla: key.Event) -> Jogador {
+  case tecla {
+    key.Char("a") | key.Char("A") -> Jogador(..q, x: q.x - deslocamento)
+    key.Char("d") | key.Char("D") -> Jogador(..q, x: q.x + deslocamento)
+    key.Char("w") | key.Char("W") -> Jogador(..q, y: q.y - deslocamento)
+    key.Char("s") | key.Char("S") -> Jogador(..q, y: q.y + deslocamento)
+    _ -> q
+  }
+}
+
+// recebe a Partida inteira, que é o estado do world
+pub fn tecla(p: Partida, evento: key.Event) -> Partida {
+  Partida(
+    ..p,
+    eu: move_wasd(p.eu, evento),
+    oponente: move(p.oponente, evento),
+  )
+}
