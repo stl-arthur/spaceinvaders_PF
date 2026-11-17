@@ -2,6 +2,12 @@ import sgleam/fill
 import sgleam/image
 import sgleam/world
 
+const largura_tela = 800
+const altura_tela = 600
+const deslocamento = 5
+const q_x = 0
+const q_y = -300
+
 pub type Vetor {
   Vetor(x: Float, y: Float)
 }
@@ -54,12 +60,10 @@ fn cena_ovni(tick: Int) -> image.Image {
   let ovni =
     image.circle(10, fill.green)
     |> image.overlay(image.rectangle(40, 4, fill.green))
-  image.empty_scene(100, 80) |> image.place_image(50, tick, ovni)
+  image.empty_scene(largura_tela, altura_tela) |> image.place_image(50, tick, ovni)
 }
 
 pub fn smain() {
   world.animation(cena_ovni)
 }
 
-
-image.rectangle(800, 600, fill.black)
