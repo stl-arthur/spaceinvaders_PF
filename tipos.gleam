@@ -58,7 +58,7 @@ fn cena_ovni(tick: Int) -> image.Image {
   let ovni =
     image.circle(10, fill.green)
     |> image.overlay(image.rectangle(40, 4, fill.green))
-  image.empty_scene(800, 800) |> image.place_image(50, tick, ovni)
+  image.empty_scene(800, 600) |> image.place_image(50, tick, ovni)
 }
 
 pub fn smain() {

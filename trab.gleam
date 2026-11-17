@@ -75,3 +75,5 @@ image.rectangle(800, 600, fill.black)
 
 
 image.rectangle(800, 600, fill.black)
+|> image.place_image(250, 300, image.triangle(40, fill.blue))
+|> image.place_image(550, 300, image.triangle(40, fill.red))
