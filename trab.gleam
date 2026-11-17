@@ -60,3 +60,6 @@ fn cena_ovni(tick: Int) -> image.Image {
 pub fn smain() {
   world.animation(cena_ovni)
 }
+
+
+image.rectangle(800, 600, fill.black)
