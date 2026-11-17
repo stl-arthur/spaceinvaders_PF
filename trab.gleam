@@ -67,3 +67,11 @@ pub fn smain() {
   world.animation(cena_ovni)
 }
 
+/// quadrado do fundo do game teste
+image.rectangle(800, 600, fill.black)
+
+
+/// jogador 1 e 2.
+
+
+image.rectangle(800, 600, fill.black)
