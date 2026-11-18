@@ -106,6 +106,7 @@ fn novo_campo(jogador: Player) -> Jogador {
 }
 
 // A seed não pode ser 0 (o gerador ficaria preso em 0)
+
 fn inicial(jogadores: List(Player)) -> Estado {
   Jogando(
     campos: list.map(jogadores, novo_campo),
@@ -120,7 +121,9 @@ fn inicial(jogadores: List(Player)) -> Estado {
 // ---------------------------------------------------------------------------
 
 fn proximo(seed: Int) -> Int {
+
   { seed * 16_807 } % 2_147_483_647
+
 }
 
 // Devolve um orbe verde ou vermelho em posição aleatória e a nova seed
@@ -172,6 +175,7 @@ fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
 }
 
 // Cada jogador enxerga só o próprio campo; o triângulo gira conforme a direção
+
 pub fn desenhar(estado: Estado, player: Player) -> image.Image {
 
   case estado {
@@ -197,6 +201,7 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image {
 // ---------------------------------------------------------------------------
 
 // Jogador 1: W A S D. Jogador 2: setas.
+
 fn atualiza_entrada(
 
   e: Entrada,
@@ -230,6 +235,7 @@ fn muda_tecla(
   case estado {
 
     Jogando(campos, tique, seed, objetos) -> {
+
       let indice = mworld.player_index(player)
       let campos =
         list.map(campos, fn(c) {
@@ -246,15 +252,14 @@ fn muda_tecla(
   }
 }
 
-pub fn tecla_pressionada(
-  estado: Estado,
-  player: Player,
-  evento: key.Event,
-) -> Estado {
+pub fn tecla_pressionada(estado: Estado, player: Player,evento: key.Event,) -> Estado {
+
   muda_tecla(estado, player, evento, True)
+
 }
 
 pub fn tecla_solta(estado: Estado, player: Player, evento: key.Event) -> Estado {
+
   muda_tecla(estado, player, evento, False)
 }
 
@@ -264,17 +269,22 @@ pub fn tecla_solta(estado: Estado, player: Player, evento: key.Event) -> Estado 
 
 // -1, 0 ou 1 conforme as teclas do eixo. Duas teclas opostas se anulam.
 fn eixo(menos: Bool, mais: Bool) -> Int {
+
   case menos, mais {
+
     True, False -> -1
     False, True -> 1
     _, _ -> 0
+
   }
 }
 
 // Ângulo anti-horário (graus) do triângulo, que por padrão aponta para cima.
 // sx: -1 esquerda, 1 direita. sy: -1 cima, 1 baixo.
 fn angulo_da_direcao(sx: Int, sy: Int) -> Int {
+
   case sx, sy {
+
     0, -1 -> 0
     -1, -1 -> 45
     -1, 0 -> 90
@@ -284,40 +294,47 @@ fn angulo_da_direcao(sx: Int, sy: Int) -> Int {
     1, 0 -> 270
     1, -1 -> 315
     _, _ -> 0
+
   }
 }
 
 fn passo(c: Jogador) -> Jogador {
+
   let sx = eixo(c.entrada.esquerda, c.entrada.direita)
   let sy = eixo(c.entrada.cima, c.entrada.baixo)
+
   case sx == 0 && sy == 0 {
     // parado: mantém posição e a última orientação
     True -> c
     False -> {
+
       let d = int.to_float(deslocamento)
       let velocidade = case sx != 0 && sy != 0 {
         True -> d *. diagonal
         False -> d
       }
-      Campo(
-        ..c,
-        pos: Vetor(
-          c.pos.x +. int.to_float(sx) *. velocidade,
-          c.pos.y +. int.to_float(sy) *. velocidade,
-        ),
-        angulo: angulo_da_direcao(sx, sy),
-      )
+
+      Campo(..c, pos: Vetor(c.pos.x +. int.to_float(sx) *. velocidade, c.pos.y +. int.to_float(sy) *. velocidade,),
+      angulo: angulo_da_direcao(sx, sy),)
+
     }
   }
 }
 
+
 pub fn tick(estado: Estado) -> Estado {
+
   case estado {
+
     Jogando(campos, tique, seed, objetos) -> {
+
       let campos = list.map(campos, passo)
       let tique = tique + 1
+
       case tique % intervalo_spawn == 0 {
+
         True -> {
+
           let #(orb, seed) = gera_orb(seed)
           Jogando(campos, tique, seed, [orb, ..objetos])
         }
@@ -345,4 +362,7 @@ pub fn smain() {
   |> mworld.on_key_down(tecla_pressionada)
   |> mworld.on_key_up(tecla_solta)
   |> mworld.on_tick(tick)
+
 }
+
+      
