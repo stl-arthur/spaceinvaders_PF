@@ -138,5 +138,7 @@ fn desenhar(p: Partida) -> image.Image {
     p.jogador2.y,
     image.triangle(40, fill.red),
 
-  )
+  )   
 }
+
+
