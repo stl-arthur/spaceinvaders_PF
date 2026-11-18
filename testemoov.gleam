@@ -150,10 +150,10 @@ fn atualiza_entrada(
     #(1, key.Char("s")) | #(1, key.Char("S")) -> Entrada(..e, baixo: valor)
     #(1, key.Char("a")) | #(1, key.Char("A")) -> Entrada(..e, esquerda: valor)
     #(1, key.Char("d")) | #(1, key.Char("D")) -> Entrada(..e, direita: valor)
-    #(2, key.ArrowUp) -> Entrada(..e, cima: valor)
-    #(2, key.ArrowDown) -> Entrada(..e, baixo: valor)
-    #(2, key.ArrowLeft) -> Entrada(..e, esquerda: valor)
-    #(2, key.ArrowRight) -> Entrada(..e, direita: valor)
+    #(2, key.Char("w")) | #(2, key.Char("W")) -> Entrada(..e, cima: valor)
+    #(2, key.Char("s")) | #(2, key.Char("S")) -> Entrada(..e, baixo: valor)
+    #(2, key.Char("a")) | #(2, key.Char("A")) -> Entrada(..e, esquerda: valor)
+    #(2, key.Char("d")) | #(2, key.Char("D")) -> Entrada(..e, direita: valor)
     _ -> e
   }
 }
