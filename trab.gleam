@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
@@ -19,6 +20,19 @@ const q_y = 300
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
 // ---------------------------------------------------------------------------
+=======
+import gleam/float
+import sgleam/fill
+import sgleam/image
+import sgleam/key
+import sgleam/world
+>>>>>>> 5398e74d2f588700818f335f861e51b1098a5bf6
+
+const largura_tela = 800
+
+const altura_tela = 600
+
+const deslocamento = 5.0
 
 pub type Vetor {
   Vetor(x: Float, y: Float)
@@ -26,7 +40,13 @@ pub type Vetor {
 
 pub type Estado {
   // Abertura
+
   Lobby(jogadores: List(Player), segundos: Option(Int))
+
+  Menu
+  Lobby(eu_pronto: Bool, oponente_pronto: Bool)
+  Contagem(segundos: Int)
+
   // Partida
   Jogando(campos: List(Jogador), tique: Int, seed: Int)
   // Resultado
@@ -61,6 +81,7 @@ pub type Tiro {
   Tiro(pos: Vetor, vel: Vetor)
 }
 
+<<<<<<< HEAD
 // ---------------------------------------------------------------------------
 // Estado inicial
 // ---------------------------------------------------------------------------
@@ -179,3 +200,68 @@ pub fn smain() {
   )
   |> mworld.on_key_down(tecla)
 }
+=======
+// oponente: setas
+pub fn move(q: Jogador, tecla: key.Event) -> Jogador {
+  case tecla {
+    key.ArrowLeft -> Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x -. deslocamento))
+    key.ArrowRight ->
+      Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x +. deslocamento))
+    key.ArrowUp -> Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y -. deslocamento))
+    key.ArrowDown ->
+      Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y +. deslocamento))
+    _ -> q
+  }
+}
+
+// eu: WASD
+pub fn move_wasd(q: Jogador, tecla: key.Event) -> Jogador {
+  case tecla {
+    key.Char("a") | key.Char("A") ->
+      Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x -. deslocamento))
+    key.Char("d") | key.Char("D") ->
+      Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x +. deslocamento))
+    key.Char("w") | key.Char("W") ->
+      Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y -. deslocamento))
+    key.Char("s") | key.Char("S") ->
+      Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y +. deslocamento))
+    _ -> q
+  }
+}
+
+// recebe a Partida inteira, que é o estado do world
+pub fn tecla(p: Partida, evento: key.Event) -> Partida {
+  Partida(..p, eu: move_wasd(p.eu, evento), oponente: move(p.oponente, evento))
+}
+
+/// Estado inicial do Game:
+fn inicial() -> Partida {
+  Partida(
+    eu: Jogador(pos: Vetor(250.0, 300.0), vida: 100, pontos: 0, sob_efeito: False),
+    oponente: Jogador(
+      pos: Vetor(550.0, 300.0),
+      vida: 100,
+      pontos: 0,
+      sob_efeito: False,
+    ),
+    objetos: [],
+    tiros: [],
+  )
+}
+
+fn desenhar(p: Partida) -> image.Image {
+  image.rectangle(largura_tela, altura_tela, fill.black)
+  |> image.place_image(
+    float.round(p.eu.pos.x),
+    float.round(p.eu.pos.y),
+    image.triangle(40, fill.blue),
+  )
+  |> image.place_image(
+    float.round(p.oponente.pos.x),
+    float.round(p.oponente.pos.y),
+    image.triangle(40, fill.red),
+  )
+}
+
+
+>>>>>>> 5398e74d2f588700818f335f861e51b1098a5bf6
