@@ -37,6 +37,13 @@ const margem_orb = 20
 
 const raio_orb = 10
 
+// y fixo onde todo orbe nasce: logo acima da tela (use 0.0 para nascer na borda)
+const y_inicial = -10.0
+
+// pixels por tick que o orbe desce (menor que o `deslocamento` do jogador)
+const velocidade_orb = 2.0
+
+
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
 // ---------------------------------------------------------------------------
@@ -132,18 +139,29 @@ fn proximo(seed: Int) -> Int {
   { seed * 16_807 } % 2_147_483_647
 }
 
-// Devolve um orbe verde ou vermelho em posição aleatória e a nova seed
+// Devolve um orbe verde ou vermelho com x aleatório, y fixo no alto e descendo,
+// mais a nova seed
 fn gera_orb(seed: Int) -> #(Objeto, Int) {
   let s1 = proximo(seed)
   let s2 = proximo(s1)
-  let s3 = proximo(s2)
   let x = margem_orb + s1 % { largura_tela - 2 * margem_orb }
-  let y = margem_orb + s2 % { altura_tela - 2 * margem_orb }
-  let tipo = case s3 % 2 {
+  let tipo = case s2 % 2 {
     0 -> OrbVerde
     _ -> OrbVermelho
   }
-  #(Objeto(tipo, Vetor(int.to_float(x), int.to_float(y)), Vetor(0.0, 0.0)), s3)
+  #(
+    Objeto(tipo, Vetor(int.to_float(x), y_inicial), Vetor(0.0, velocidade_orb)),
+    s2,
+  )
+}
+
+// Os orbes não colidem com a borda: atravessam a tela e somem depois de sair
+fn move_objeto(o: Objeto) -> Objeto {
+  Objeto(..o, pos: Vetor(o.pos.x +. o.vel.x, o.pos.y +. o.vel.y))
+}
+
+fn ainda_visivel(o: Objeto) -> Bool {
+  o.pos.y <. int.to_float(altura_tela + raio_orb)
 }
 
 // ---------------------------------------------------------------------------
