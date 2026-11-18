@@ -1,11 +1,12 @@
+import gleam/float
 import gleam/int
 import gleam/list
-import gleam/float
 import gleam/option.{type Option}
 import sgleam/fill
 import sgleam/image
 import sgleam/key
 import sgleam/mworld.{type Player}
+import sgleam/style
 
 const largura_tela = 800
 
@@ -21,8 +22,20 @@ const q_x = 400
 
 const q_y = 300
 
+// opacidade do outro jogador na tela de cada jogador
+
+const opacidade_f = 0.35 
+
 // 1 / raiz de 2: evita que a diagonal seja mais rápida que as outras direções
 const diagonal = 0.7
+
+// um orbe novo a cada 15 segundos (15 * 28 ticks por segundo)
+const intervalo_spawn = 420
+
+// borda para o orbe nascer (Int). A `margem` Float acima é da nave
+const margem_orb = 20
+
+const raio_orb = 10
 
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
@@ -36,7 +49,12 @@ pub type Estado {
   // Abertura
   Lobby(jogadores: List(Player), segundos: Option(Int))
   // Partida
-  Jogando(jogadores: List(Jogador), tique: Int, seed: Int)
+  Jogando(
+    jogadores: List(Jogador),
+    tique: Int,
+    seed: Int,
+    objetos: List(Objeto),
+  )
   // Resultado
   FimDeJogo(status: List(Jogador))
 }
@@ -96,8 +114,36 @@ fn novo_jogador(jogador: Player) -> Jogador {
   )
 }
 
+// A seed não pode ser 0 (o gerador ficaria preso em 0)
 fn inicial(jogadores: List(Player)) -> Estado {
-  Jogando(jogadores: list.map(jogadores, novo_jogador), tique: 0, seed: 0)
+  Jogando(
+    jogadores: list.map(jogadores, novo_jogador),
+    tique: 0,
+    seed: 12_345,
+    objetos: [],
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Geração aleatória (determinística, usa a seed do estado)
+// ---------------------------------------------------------------------------
+
+fn proximo(seed: Int) -> Int {
+  { seed * 16_807 } % 2_147_483_647
+}
+
+// Devolve um orbe verde ou vermelho em posição aleatória e a nova seed
+fn gera_orb(seed: Int) -> #(Objeto, Int) {
+  let s1 = proximo(seed)
+  let s2 = proximo(s1)
+  let s3 = proximo(s2)
+  let x = margem_orb + s1 % { largura_tela - 2 * margem_orb }
+  let y = margem_orb + s2 % { altura_tela - 2 * margem_orb }
+  let tipo = case s3 % 2 {
+    0 -> OrbVerde
+    _ -> OrbVermelho
+  }
+  #(Objeto(tipo, Vetor(int.to_float(x), int.to_float(y)), Vetor(0.0, 0.0)), s3)
 }
 
 // ---------------------------------------------------------------------------
@@ -109,40 +155,79 @@ fn fundo() -> image.Image {
 }
 
 // Jogador 1 é azul, os demais são vermelhos
-fn triangulo(p: Player) -> image.Image {
-  case mworld.player_index(p) {
-    1 -> image.triangle(40, fill.blue)
-    _ -> image.triangle(40, fill.red)
+fn triangulo(p: Player, opacidade: Float) -> image.Image {
+  let cor = case mworld.player_index(p) {
+    1 -> fill.blue
+    _ -> fill.red
   }
+  image.triangle(40, style.join([cor, fill.opacityf(opacidade)]))
+}
+
+fn nave(c: Jogador, opacidade: Float) -> image.Image{
+  image.rotate(triangulo(c.jogador, opacidade), c.angulo)
 }
 
 fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
   mworld.player_index(c.jogador) == mworld.player_index(player)
 }
 
-// Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
-pub fn desenhar(estado: Estado, player: Player) -> image.Image {
-  case estado {
-    Jogando(jogadores, _, _) ->
-      case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-        Ok(c) ->
-          fundo()
-          |> image.place_imagef(
-            c.pos.x,
-            c.pos.y,
-            image.rotate(triangulo(c.jogador), c.angulo),
-          )
-        Error(_) -> fundo()
-      }
+fn imagem_objeto(o: Objeto) -> image.Image {
+  case o.tipo {
+    OrbVerde -> image.circle(raio_orb, fill.green)
+    OrbVermelho -> image.circle(raio_orb, fill.red)
+    _ -> image.circle(raio_orb, fill.white)
+  }
+}
+
+fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
+  list.fold(objetos, base, fn(img, o) {
+    image.place_imagef(img, o.pos.x, o.pos.y, imagem_objeto(o))
+  })
+}
+
+
+fn desenha_nave(cena: image.Image, c: Jogador, opacidade: Float) -> image.Image{
+  image.place_imagef(cena, c.pos.x, c.pos.y, nave(c, opacidade))
+}
+
+pub fn desenhar(estado: Estado, player: Player) -> image.Image{
+  case estado{
+    Jogando(jogadores, _, _, objetos) -> {
+      let outros = list.filter(jogadores, fn(c) { !eh_do_jogador(c, player)})
+      let meus = list.filter(jogadores, fn(c) {eh_do_jogador(c, player)})
+      let cena = 
+        list.fold(outros, com_objetos(fundo(), objetos), fn(cena, c){
+          desenha_nave(cena, c, opacidade_f)
+        })
+        list.fold(meus, cena, fn(cena, c) {desenha_nave(cena, c, 1.0)})
+    }
     _ -> fundo()
   }
 }
+
+// // Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
+// pub fn desenhar(estado: Estado, player: Player) -> image.Image {
+//   case estado {
+//     Jogando(jogadores, _, _, objetos) ->
+//       case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
+//         Ok(c) ->
+//           com_objetos(fundo(), objetos)
+//           |> image.place_imagef(
+//             c.pos.x,
+//             c.pos.y,
+//             image.rotate(triangulo(c.jogador), c.angulo),
+//           )
+//         Error(_) -> fundo()
+//       }
+//     _ -> fundo()
+//   }
+// }
 
 // ---------------------------------------------------------------------------
 // Teclas: guardam quais direções estão seguradas
 // ---------------------------------------------------------------------------
 
-// Jogador 1: W A S D. Jogador 2: setas.
+// Jogador 1: W A S D. Jogador 2: W A S D.
 fn atualiza_entrada(
   e: Entrada,
   indice: Int,
@@ -169,7 +254,7 @@ fn muda_tecla(
   valor: Bool,
 ) -> Estado {
   case estado {
-    Jogando(jogadores, tique, seed) -> {
+    Jogando(jogadores, tique, seed, objetos) -> {
       let indice = mworld.player_index(player)
       let jogadores =
         list.map(jogadores, fn(c) {
@@ -182,7 +267,7 @@ fn muda_tecla(
             False -> c
           }
         })
-      Jogando(jogadores, tique, seed)
+      Jogando(jogadores, tique, seed, objetos)
     }
     _ -> estado
   }
@@ -251,7 +336,7 @@ fn passo(c: Jogador) -> Jogador {
         ..c,
         pos: Vetor(
           limita(x, margem, int.to_float(largura_tela) -. margem),
-          limita(y, margem, int.to_float(altura_tela) -. margem), 
+          limita(y, margem, int.to_float(altura_tela) -. margem),
         ),
         angulo: angulo_da_direcao(sx, sy),
       )
@@ -261,7 +346,17 @@ fn passo(c: Jogador) -> Jogador {
 
 pub fn tick(estado: Estado) -> Estado {
   case estado {
-    Jogando(jogadores, tique, seed) -> Jogando(list.map(jogadores, passo), tique + 1, seed)
+    Jogando(jogadores, tique, seed, objetos) -> {
+      let jogadores = list.map(jogadores, passo)
+      let tique = tique + 1
+      case tique % intervalo_spawn == 0 {
+        True -> {
+          let #(orb, seed) = gera_orb(seed)
+          Jogando(jogadores, tique, seed, [orb, ..objetos])
+        }
+        False -> Jogando(jogadores, tique, seed, objetos)
+      }
+    }
     _ -> estado
   }
 }
