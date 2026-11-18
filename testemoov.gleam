@@ -1,5 +1,6 @@
 import gleam/int
 import gleam/list
+import gleam/float
 import gleam/option.{type Option}
 import sgleam/fill
 import sgleam/image
@@ -9,6 +10,9 @@ import sgleam/mworld.{type Player}
 const largura_tela = 800
 
 const altura_tela = 600
+
+// limite para que quando a nave encoste na borda ela não fique pela metade
+const margem = 20.0
 
 // pixels por tick (o mundo roda a 28 ticks por segundo por padrão)
 const deslocamento = 5
@@ -32,7 +36,7 @@ pub type Estado {
   // Abertura
   Lobby(jogadores: List(Player), segundos: Option(Int))
   // Partida
-  Jogando(campos: List(Jogador), tique: Int, seed: Int)
+  Jogando(jogadores: List(Jogador), tique: Int, seed: Int)
   // Resultado
   FimDeJogo(status: List(Jogador))
 }
@@ -43,13 +47,13 @@ pub type Entrada {
 }
 
 pub type Jogador {
-  Campo(
+  Jogador(
     jogador: Player,
     pos: Vetor,
     vida: Int,
     pontos: Int,
     recarga: Int,
-    objetos: List(TipoObjeto),
+    objetos: List(Objeto),
     tiros: List(Tiro),
     // novos: teclas seguradas e ângulo do triângulo
     // (graus, sentido anti-horário; 0 = apontando para cima)
@@ -78,8 +82,8 @@ pub type Tiro {
 // Estado inicial
 // ---------------------------------------------------------------------------
 
-fn novo_campo(jogador: Player) -> Jogador {
-  Campo(
+fn novo_jogador(jogador: Player) -> Jogador {
+  Jogador(
     jogador: jogador,
     pos: Vetor(int.to_float(q_x), int.to_float(q_y)),
     vida: 100,
@@ -93,7 +97,7 @@ fn novo_campo(jogador: Player) -> Jogador {
 }
 
 fn inicial(jogadores: List(Player)) -> Estado {
-  Jogando(campos: list.map(jogadores, novo_campo), tique: 0, seed: 0)
+  Jogando(jogadores: list.map(jogadores, novo_jogador), tique: 0, seed: 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -116,11 +120,11 @@ fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
   mworld.player_index(c.jogador) == mworld.player_index(player)
 }
 
-// Cada jogador enxerga só o próprio campo; o triângulo gira conforme a direção
+// Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
 pub fn desenhar(estado: Estado, player: Player) -> image.Image {
   case estado {
-    Jogando(campos, _, _) ->
-      case list.find(campos, fn(c) { eh_do_jogador(c, player) }) {
+    Jogando(jogadores, _, _) ->
+      case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
         Ok(c) ->
           fundo()
           |> image.place_imagef(
@@ -165,20 +169,20 @@ fn muda_tecla(
   valor: Bool,
 ) -> Estado {
   case estado {
-    Jogando(campos, tique, seed) -> {
+    Jogando(jogadores, tique, seed) -> {
       let indice = mworld.player_index(player)
-      let campos =
-        list.map(campos, fn(c) {
+      let jogadores =
+        list.map(jogadores, fn(c) {
           case eh_do_jogador(c, player) {
             True ->
-              Campo(
+              Jogador(
                 ..c,
                 entrada: atualiza_entrada(c.entrada, indice, evento, valor),
               )
             False -> c
           }
         })
-      Jogando(campos, tique, seed)
+      Jogando(jogadores, tique, seed)
     }
     _ -> estado
   }
@@ -194,6 +198,10 @@ pub fn tecla_pressionada(
 
 pub fn tecla_solta(estado: Estado, player: Player, evento: key.Event) -> Estado {
   muda_tecla(estado, player, evento, False)
+}
+
+pub fn limita(v: Float, min: Float, max: Float) -> Float {
+  float.max(min, float.min(v, max))
 }
 
 // ---------------------------------------------------------------------------
@@ -237,11 +245,13 @@ fn passo(c: Jogador) -> Jogador {
         True -> d *. diagonal
         False -> d
       }
-      Campo(
+      let x = c.pos.x +. int.to_float(sx) *. velocidade
+      let y = c.pos.y +. int.to_float(sy) *. velocidade
+      Jogador(
         ..c,
         pos: Vetor(
-          c.pos.x +. int.to_float(sx) *. velocidade,
-          c.pos.y +. int.to_float(sy) *. velocidade,
+          limita(x, margem, int.to_float(largura_tela) -. margem),
+          limita(y, margem, int.to_float(altura_tela) -. margem), 
         ),
         angulo: angulo_da_direcao(sx, sy),
       )
@@ -251,7 +261,7 @@ fn passo(c: Jogador) -> Jogador {
 
 pub fn tick(estado: Estado) -> Estado {
   case estado {
-    Jogando(campos, tique, seed) -> Jogando(list.map(campos, passo), tique, seed)
+    Jogando(jogadores, tique, seed) -> Jogando(list.map(jogadores, passo), tique + 1, seed)
     _ -> estado
   }
 }
