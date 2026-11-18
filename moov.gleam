@@ -271,3 +271,6 @@ pub fn smain() {
   |> mworld.on_key_up(tecla_solta)
   |> mworld.on_tick(tick)
 }
+
+
+/// criar geração aleatória de power ups. 
