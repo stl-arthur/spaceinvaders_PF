@@ -1,6 +1,6 @@
 import sgleam/fill
 import sgleam/image
-import sgleam/world
+import sgleam/mworld
 
 const largura_tela = 800
 const altura_tela = 600
@@ -22,7 +22,7 @@ pub type Estado {
 }
 
 pub type Jogador {
-  Campo(
+  Jogador(
     jogador: Player,
     pos: Vetor,
     vida: Int,
@@ -36,9 +36,13 @@ pub type Jogador {
 pub type TipoObjeto {
   Geodo
   Destroco
-  Inimigo
   OrbVerde
   OrbVermelho
+}
+
+pub type Inimigo {
+  Inimigo1(pos: Vetor, recarga: Int, tiros: List(Tiro)),
+  Inimigo2(pos: Vetor)
 }
 
 pub type Objeto {
@@ -52,24 +56,16 @@ pub type Tiro {
 // Teste ovni
 
 
-fn cena_ovni(tick: Int) -> image.Image {
-  let ovni =
-    image.circle(10, fill.green)
-    |> image.overlay(image.rectangle(40, 4, fill.green))
-  image.empty_scene(largura_tela, altura_tela) |> image.place_image(50, tick, ovni)
-}
-
-pub fn smain() {
-  world.animation(cena_ovni)
-}
-
 // quadrado do fundo do game teste
 image.rectangle(800, 600, fill.black)
 
 
 // jogador 1 e 2.
 
-
 image.rectangle(800, 600, fill.black)
 |> image.place_image(250, 300, image.triangle(40, fill.blue))
 |> image.place_image(550, 300, image.triangle(40, fill.red))
+
+pub fn smain(){
+  mworld.create_from()
+} 
