@@ -118,9 +118,12 @@ fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
 
 // Cada jogador enxerga só o próprio campo; o triângulo gira conforme a direção
 pub fn desenhar(estado: Estado, player: Player) -> image.Image {
+
   case estado {
+
     Jogando(campos, _, _) ->
       case list.find(campos, fn(c) { eh_do_jogador(c, player) }) {
+
         Ok(c) ->
           fundo()
           |> image.place_imagef(
@@ -140,12 +143,15 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image {
 
 // Jogador 1: W A S D. Jogador 2: setas.
 fn atualiza_entrada(
+
   e: Entrada,
   indice: Int,
   evento: key.Event,
   valor: Bool,
 ) -> Entrada {
+
   case #(indice, evento) {
+
     #(1, key.Char("w")) | #(1, key.Char("W")) -> Entrada(..e, cima: valor)
     #(1, key.Char("s")) | #(1, key.Char("S")) -> Entrada(..e, baixo: valor)
     #(1, key.Char("a")) | #(1, key.Char("A")) -> Entrada(..e, esquerda: valor)
@@ -159,22 +165,23 @@ fn atualiza_entrada(
 }
 
 fn muda_tecla(
+
   estado: Estado,
   player: Player,
   evento: key.Event,
   valor: Bool,
 ) -> Estado {
+
   case estado {
+
     Jogando(campos, tique, seed) -> {
       let indice = mworld.player_index(player)
       let campos =
         list.map(campos, fn(c) {
+
           case eh_do_jogador(c, player) {
-            True ->
-              Campo(
-                ..c,
-                entrada: atualiza_entrada(c.entrada, indice, evento, valor),
-              )
+
+            True ->  Campo(..c, entrada: atualiza_entrada(c.entrada, indice, evento, valor),)
             False -> c
           }
         })
@@ -261,12 +268,15 @@ pub fn tick(estado: Estado) -> Estado {
 // ---------------------------------------------------------------------------
 
 pub fn smain() {
+
   mworld.create_from(
+
     fn(_, jogadores) { inicial(jogadores) },
     min: 2,
     max: 2,
     to_image: desenhar,
   )
+
   |> mworld.on_key_down(tecla_pressionada)
   |> mworld.on_key_up(tecla_solta)
   |> mworld.on_tick(tick)
