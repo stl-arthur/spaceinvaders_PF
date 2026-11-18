@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
@@ -20,7 +19,7 @@ const q_y = 300
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
 // ---------------------------------------------------------------------------
-=======
+
 import gleam/float
 import sgleam/fill
 import sgleam/image
@@ -39,22 +38,16 @@ pub type Vetor {
 }
 
 pub type Estado {
-  // Abertura
 
   Lobby(jogadores: List(Player), segundos: Option(Int))
-
-  Menu
-  Lobby(eu_pronto: Bool, oponente_pronto: Bool)
   Contagem(segundos: Int)
-
-  // Partida
   Jogando(campos: List(Jogador), tique: Int, seed: Int)
-  // Resultado
   FimDeJogo(status: List(Jogador))
+
 }
 
 pub type Jogador {
-  Campo(
+  Jogador(
     jogador: Player,
     pos: Vetor,
     vida: Int,
@@ -66,8 +59,7 @@ pub type Jogador {
 }
 
 pub type TipoObjeto {
-  Geodo
-  Destroco
+  
   Inimigo
   OrbVerde
   OrbVermelho
@@ -81,7 +73,6 @@ pub type Tiro {
   Tiro(pos: Vetor, vel: Vetor)
 }
 
-<<<<<<< HEAD
 // ---------------------------------------------------------------------------
 // Estado inicial
 // ---------------------------------------------------------------------------
@@ -200,7 +191,7 @@ pub fn smain() {
   )
   |> mworld.on_key_down(tecla)
 }
-=======
+
 // oponente: setas
 pub fn move(q: Jogador, tecla: key.Event) -> Jogador {
   case tecla {
@@ -264,4 +255,4 @@ fn desenhar(p: Partida) -> image.Image {
 }
 
 
->>>>>>> 5398e74d2f588700818f335f861e51b1098a5bf6
+
