@@ -1,3 +1,4 @@
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
@@ -10,40 +11,52 @@ const largura_tela = 800
 
 const altura_tela = 600
 
+// limite para que quando a nave encoste na borda ela não fique pela metade
+const margem = 20.0
+
+// pixels por tick (o mundo roda a 28 ticks por segundo por padrão)
 const deslocamento = 5
 
 const q_x = 400
 
 const q_y = 300
 
+// 1 / raiz de 2: evita que a diagonal seja mais rápida que as outras direções
+const diagonal = 0.7
+
+// um orbe novo a cada 15 segundos (15 * 28 ticks por segundo)
+const intervalo_spawn = 420
+
+// borda para o orbe nascer (Int). A `margem` Float acima é da nave
+const margem_orb = 20
+
+const raio_orb = 10
+
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
 // ---------------------------------------------------------------------------
-
-import gleam/float
-import sgleam/fill
-import sgleam/image
-import sgleam/key
-import sgleam/world
->>>>>>> 5398e74d2f588700818f335f861e51b1098a5bf6
-
-const largura_tela = 800
-
-const altura_tela = 600
-
-const deslocamento = 5.0
 
 pub type Vetor {
   Vetor(x: Float, y: Float)
 }
 
 pub type Estado {
-
+  // Abertura
   Lobby(jogadores: List(Player), segundos: Option(Int))
-  Contagem(segundos: Int)
-  Jogando(campos: List(Jogador), tique: Int, seed: Int)
+  // Partida
+  Jogando(
+    jogadores: List(Jogador),
+    tique: Int,
+    seed: Int,
+    objetos: List(Objeto),
+  )
+  // Resultado
   FimDeJogo(status: List(Jogador))
+}
 
+// Teclas de direção que o jogador está segurando agora
+pub type Entrada {
+  Entrada(cima: Bool, baixo: Bool, esquerda: Bool, direita: Bool)
 }
 
 pub type Jogador {
@@ -53,13 +66,18 @@ pub type Jogador {
     vida: Int,
     pontos: Int,
     recarga: Int,
-    objetos: List(TipoObjeto),
+    objetos: List(Objeto),
     tiros: List(Tiro),
+    // novos: teclas seguradas e ângulo do triângulo
+    // (graus, sentido anti-horário; 0 = apontando para cima)
+    entrada: Entrada,
+    angulo: Int,
   )
 }
 
 pub type TipoObjeto {
-  
+  Geodo
+  Destroco
   Inimigo
   OrbVerde
   OrbVermelho
@@ -77,9 +95,8 @@ pub type Tiro {
 // Estado inicial
 // ---------------------------------------------------------------------------
 
-// Cada jogador da partida ganha o seu próprio campo, no centro da tela
-fn novo_campo(jogador: Player) -> Jogador {
-  Campo(
+fn novo_jogador(jogador: Player) -> Jogador {
+  Jogador(
     jogador: jogador,
     pos: Vetor(int.to_float(q_x), int.to_float(q_y)),
     vida: 100,
@@ -87,11 +104,41 @@ fn novo_campo(jogador: Player) -> Jogador {
     recarga: 0,
     objetos: [],
     tiros: [],
+    entrada: Entrada(False, False, False, False),
+    angulo: 0,
   )
 }
 
+// A seed não pode ser 0 (o gerador ficaria preso em 0)
 fn inicial(jogadores: List(Player)) -> Estado {
-  Jogando(campos: list.map(jogadores, novo_campo), tique: 0, seed: 0)
+  Jogando(
+    jogadores: list.map(jogadores, novo_jogador),
+    tique: 0,
+    seed: 12_345,
+    objetos: [],
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Geração aleatória (determinística, usa a seed do estado)
+// ---------------------------------------------------------------------------
+
+fn proximo(seed: Int) -> Int {
+  { seed * 16_807 } % 2_147_483_647
+}
+
+// Devolve um orbe verde ou vermelho em posição aleatória e a nova seed
+fn gera_orb(seed: Int) -> #(Objeto, Int) {
+  let s1 = proximo(seed)
+  let s2 = proximo(s1)
+  let s3 = proximo(s2)
+  let x = margem_orb + s1 % { largura_tela - 2 * margem_orb }
+  let y = margem_orb + s2 % { altura_tela - 2 * margem_orb }
+  let tipo = case s3 % 2 {
+    0 -> OrbVerde
+    _ -> OrbVermelho
+  }
+  #(Objeto(tipo, Vetor(int.to_float(x), int.to_float(y)), Vetor(0.0, 0.0)), s3)
 }
 
 // ---------------------------------------------------------------------------
@@ -114,14 +161,32 @@ fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
   mworld.player_index(c.jogador) == mworld.player_index(player)
 }
 
-// Cada jogador enxerga só o próprio campo
+fn imagem_objeto(o: Objeto) -> image.Image {
+  case o.tipo {
+    OrbVerde -> image.circle(raio_orb, fill.green)
+    OrbVermelho -> image.circle(raio_orb, fill.red)
+    _ -> image.circle(raio_orb, fill.white)
+  }
+}
+
+fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
+  list.fold(objetos, base, fn(img, o) {
+    image.place_imagef(img, o.pos.x, o.pos.y, imagem_objeto(o))
+  })
+}
+
+// Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
 pub fn desenhar(estado: Estado, player: Player) -> image.Image {
   case estado {
-    Jogando(campos, _, _) ->
-      case list.find(campos, fn(c) { eh_do_jogador(c, player) }) {
+    Jogando(jogadores, _, _, objetos) ->
+      case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
         Ok(c) ->
-          fundo()
-          |> image.place_imagef(c.pos.x, c.pos.y, triangulo(c.jogador))
+          com_objetos(fundo(), objetos)
+          |> image.place_imagef(
+            c.pos.x,
+            c.pos.y,
+            image.rotate(triangulo(c.jogador), c.angulo),
+          )
         Error(_) -> fundo()
       }
     _ -> fundo()
@@ -129,50 +194,138 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image {
 }
 
 // ---------------------------------------------------------------------------
-// Movimento
+// Teclas: guardam quais direções estão seguradas
 // ---------------------------------------------------------------------------
 
-fn mover(c: Jogador, dx: Float, dy: Float) -> Jogador {
-  Campo(..c, pos: Vetor(c.pos.x +. dx, c.pos.y +. dy))
-}
-
-// Setas
-pub fn move(c: Jogador, tecla: key.Event) -> Jogador {
-  let d = int.to_float(deslocamento)
-  case tecla {
-    key.ArrowLeft -> mover(c, 0.0 -. d, 0.0)
-    key.ArrowRight -> mover(c, d, 0.0)
-    key.ArrowUp -> mover(c, 0.0, 0.0 -. d)
-    key.ArrowDown -> mover(c, 0.0, d)
-    _ -> c
+// Jogador 1: W A S D. Jogador 2: W A S D.
+fn atualiza_entrada(
+  e: Entrada,
+  indice: Int,
+  evento: key.Event,
+  valor: Bool,
+) -> Entrada {
+  case #(indice, evento) {
+    #(1, key.Char("w")) | #(1, key.Char("W")) -> Entrada(..e, cima: valor)
+    #(1, key.Char("s")) | #(1, key.Char("S")) -> Entrada(..e, baixo: valor)
+    #(1, key.Char("a")) | #(1, key.Char("A")) -> Entrada(..e, esquerda: valor)
+    #(1, key.Char("d")) | #(1, key.Char("D")) -> Entrada(..e, direita: valor)
+    #(2, key.Char("w")) | #(2, key.Char("W")) -> Entrada(..e, cima: valor)
+    #(2, key.Char("s")) | #(2, key.Char("S")) -> Entrada(..e, baixo: valor)
+    #(2, key.Char("a")) | #(2, key.Char("A")) -> Entrada(..e, esquerda: valor)
+    #(2, key.Char("d")) | #(2, key.Char("D")) -> Entrada(..e, direita: valor)
+    _ -> e
   }
 }
 
-// WASD
-pub fn move_wasd(c: Jogador, tecla: key.Event) -> Jogador {
-  let d = int.to_float(deslocamento)
-  case tecla {
-    key.Char("a") | key.Char("A") -> mover(c, 0.0 -. d, 0.0)
-    key.Char("d") | key.Char("D") -> mover(c, d, 0.0)
-    key.Char("w") | key.Char("W") -> mover(c, 0.0, 0.0 -. d)
-    key.Char("s") | key.Char("S") -> mover(c, 0.0, d)
-    _ -> c
-  }
-}
-
-// Handler de teclado do mworld: move só o campo de quem apertou a tecla.
-// Cada jogador está no próprio computador, então vale WASD ou setas.
-pub fn tecla(estado: Estado, player: Player, evento: key.Event) -> Estado {
+fn muda_tecla(
+  estado: Estado,
+  player: Player,
+  evento: key.Event,
+  valor: Bool,
+) -> Estado {
   case estado {
-    Jogando(campos, tique, seed) -> {
-      let campos =
-        list.map(campos, fn(c) {
+    Jogando(jogadores, tique, seed, objetos) -> {
+      let indice = mworld.player_index(player)
+      let jogadores =
+        list.map(jogadores, fn(c) {
           case eh_do_jogador(c, player) {
-            True -> move(move_wasd(c, evento), evento)
+            True ->
+              Jogador(
+                ..c,
+                entrada: atualiza_entrada(c.entrada, indice, evento, valor),
+              )
             False -> c
           }
         })
-      Jogando(campos, tique, seed)
+      Jogando(jogadores, tique, seed, objetos)
+    }
+    _ -> estado
+  }
+}
+
+pub fn tecla_pressionada(
+  estado: Estado,
+  player: Player,
+  evento: key.Event,
+) -> Estado {
+  muda_tecla(estado, player, evento, True)
+}
+
+pub fn tecla_solta(estado: Estado, player: Player, evento: key.Event) -> Estado {
+  muda_tecla(estado, player, evento, False)
+}
+
+pub fn limita(v: Float, min: Float, max: Float) -> Float {
+  float.max(min, float.min(v, max))
+}
+
+// ---------------------------------------------------------------------------
+// Movimento (a cada tick)
+// ---------------------------------------------------------------------------
+
+// -1, 0 ou 1 conforme as teclas do eixo. Duas teclas opostas se anulam.
+fn eixo(menos: Bool, mais: Bool) -> Int {
+  case menos, mais {
+    True, False -> -1
+    False, True -> 1
+    _, _ -> 0
+  }
+}
+
+// Ângulo anti-horário (graus) do triângulo, que por padrão aponta para cima.
+// sx: -1 esquerda, 1 direita. sy: -1 cima, 1 baixo.
+fn angulo_da_direcao(sx: Int, sy: Int) -> Int {
+  case sx, sy {
+    0, -1 -> 0
+    -1, -1 -> 45
+    -1, 0 -> 90
+    -1, 1 -> 135
+    0, 1 -> 180
+    1, 1 -> 225
+    1, 0 -> 270
+    1, -1 -> 315
+    _, _ -> 0
+  }
+}
+
+fn passo(c: Jogador) -> Jogador {
+  let sx = eixo(c.entrada.esquerda, c.entrada.direita)
+  let sy = eixo(c.entrada.cima, c.entrada.baixo)
+  case sx == 0 && sy == 0 {
+    // parado: mantém posição e a última orientação
+    True -> c
+    False -> {
+      let d = int.to_float(deslocamento)
+      let velocidade = case sx != 0 && sy != 0 {
+        True -> d *. diagonal
+        False -> d
+      }
+      let x = c.pos.x +. int.to_float(sx) *. velocidade
+      let y = c.pos.y +. int.to_float(sy) *. velocidade
+      Jogador(
+        ..c,
+        pos: Vetor(
+          limita(x, margem, int.to_float(largura_tela) -. margem),
+          limita(y, margem, int.to_float(altura_tela) -. margem),
+        ),
+        angulo: angulo_da_direcao(sx, sy),
+      )
+    }
+  }
+}
+
+pub fn tick(estado: Estado) -> Estado {
+  case estado {
+    Jogando(jogadores, tique, seed, objetos) -> {
+      let jogadores = list.map(jogadores, passo)
+      let tique = tique + 1
+      case tique % intervalo_spawn == 0 {
+        True -> {
+          let #(orb, seed) = gera_orb(seed)
+          Jogando(jogadores, tique, seed, [orb, ..objetos])
+        }
+        False -> Jogando(jogadores, tique, seed, objetos)
+      }
     }
     _ -> estado
   }
@@ -189,70 +342,7 @@ pub fn smain() {
     max: 2,
     to_image: desenhar,
   )
-  |> mworld.on_key_down(tecla)
+  |> mworld.on_key_down(tecla_pressionada)
+  |> mworld.on_key_up(tecla_solta)
+  |> mworld.on_tick(tick)
 }
-
-// oponente: setas
-pub fn move(q: Jogador, tecla: key.Event) -> Jogador {
-  case tecla {
-    key.ArrowLeft -> Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x -. deslocamento))
-    key.ArrowRight ->
-      Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x +. deslocamento))
-    key.ArrowUp -> Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y -. deslocamento))
-    key.ArrowDown ->
-      Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y +. deslocamento))
-    _ -> q
-  }
-}
-
-// eu: WASD
-pub fn move_wasd(q: Jogador, tecla: key.Event) -> Jogador {
-  case tecla {
-    key.Char("a") | key.Char("A") ->
-      Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x -. deslocamento))
-    key.Char("d") | key.Char("D") ->
-      Jogador(..q, pos: Vetor(..q.pos, x: q.pos.x +. deslocamento))
-    key.Char("w") | key.Char("W") ->
-      Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y -. deslocamento))
-    key.Char("s") | key.Char("S") ->
-      Jogador(..q, pos: Vetor(..q.pos, y: q.pos.y +. deslocamento))
-    _ -> q
-  }
-}
-
-// recebe a Partida inteira, que é o estado do world
-pub fn tecla(p: Partida, evento: key.Event) -> Partida {
-  Partida(..p, eu: move_wasd(p.eu, evento), oponente: move(p.oponente, evento))
-}
-
-/// Estado inicial do Game:
-fn inicial() -> Partida {
-  Partida(
-    eu: Jogador(pos: Vetor(250.0, 300.0), vida: 100, pontos: 0, sob_efeito: False),
-    oponente: Jogador(
-      pos: Vetor(550.0, 300.0),
-      vida: 100,
-      pontos: 0,
-      sob_efeito: False,
-    ),
-    objetos: [],
-    tiros: [],
-  )
-}
-
-fn desenhar(p: Partida) -> image.Image {
-  image.rectangle(largura_tela, altura_tela, fill.black)
-  |> image.place_image(
-    float.round(p.eu.pos.x),
-    float.round(p.eu.pos.y),
-    image.triangle(40, fill.blue),
-  )
-  |> image.place_image(
-    float.round(p.oponente.pos.x),
-    float.round(p.oponente.pos.y),
-    image.triangle(40, fill.red),
-  )
-}
-
-
-
