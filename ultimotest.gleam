@@ -6,6 +6,7 @@ import sgleam/fill
 import sgleam/image
 import sgleam/key
 import sgleam/mworld.{type Player}
+import sgleam/style
 
 const largura_tela = 800
 
@@ -20,6 +21,10 @@ const deslocamento = 5
 const q_x = 400
 
 const q_y = 300
+
+// opacidade do outro jogador na tela de cada jogador
+
+const opacidade_f = 0.35 
 
 // 1 / raiz de 2: evita que a diagonal seja mais rápida que as outras direções
 const diagonal = 0.7
@@ -167,11 +172,16 @@ fn fundo() -> image.Image {
 }
 
 // Jogador 1 é azul, os demais são vermelhos
-fn triangulo(p: Player) -> image.Image {
-  case mworld.player_index(p) {
-    1 -> image.triangle(40, fill.blue)
-    _ -> image.triangle(40, fill.red)
+fn triangulo(p: Player, opacidade: Float) -> image.Image {
+  let cor = case mworld.player_index(p) {
+    1 -> fill.blue
+    _ -> fill.red
   }
+  image.triangle(40, style.join([cor, fill.opacityf(opacidade)]))
+}
+
+fn nave(c: Jogador, opacidade: Float) -> image.Image{
+  image.rotate(triangulo(c.jogador, opacidade), c.angulo)
 }
 
 fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
@@ -192,23 +202,43 @@ fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
   })
 }
 
-// Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
-pub fn desenhar(estado: Estado, player: Player) -> image.Image {
-  case estado {
-    Jogando(jogadores, _, _, objetos) ->
-      case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-        Ok(c) ->
-          com_objetos(fundo(), objetos)
-          |> image.place_imagef(
-            c.pos.x,
-            c.pos.y,
-            image.rotate(triangulo(c.jogador), c.angulo),
-          )
-        Error(_) -> fundo()
-      }
+
+fn desenha_nave(cena: image.Image, c: Jogador, opacidade: Float) -> image.Image{
+  image.place_imagef(cena, c.pos.x, c.pos.y, nave(c, opacidade))
+}
+
+pub fn desenhar(estado: Estado, player: Player) -> image.Image{
+  case estado{
+    Jogando(jogadores, _, _, objetos) -> {
+      let outros = list.filter(jogadores, fn(c) { !eh_do_jogador(c, player)})
+      let meus = list.filter(jogadores, fn(c) {eh_do_jogador(c, player)})
+      let cena = 
+        list.fold(outros, com_objetos(fundo(), objetos), fn(cena, c){
+          desenha_nave(cena, c, opacidade_f)
+        })
+        list.fold(meus, cena, fn(cena, c) {desenha_nave(cena, c, 1.0)})
+    }
     _ -> fundo()
   }
 }
+
+// // Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
+// pub fn desenhar(estado: Estado, player: Player) -> image.Image {
+//   case estado {
+//     Jogando(jogadores, _, _, objetos) ->
+//       case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
+//         Ok(c) ->
+//           com_objetos(fundo(), objetos)
+//           |> image.place_imagef(
+//             c.pos.x,
+//             c.pos.y,
+//             image.rotate(triangulo(c.jogador), c.angulo),
+//           )
+//         Error(_) -> fundo()
+//       }
+//     _ -> fundo()
+//   }
+// }
 
 // ---------------------------------------------------------------------------
 // Teclas: guardam quais direções estão seguradas
