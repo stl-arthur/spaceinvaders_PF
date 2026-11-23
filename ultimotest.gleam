@@ -69,11 +69,14 @@ pub type Jogador {
   Jogador(
     jogador: Player,
     pos: Vetor,
+    // Vidas: lista de 3 booleans (True=viva, False=perdida)
     vidas: List(Bool),
+    // Pontuação visível na tela
     pontos: Int,
     recarga: Int,
     objetos: List(Objeto),
     tiros: List(Tiro),
+
     // novos: teclas seguradas e ângulo do triângulo
     // (graus, sentido anti-horário; 0 = apontando para cima)
     entrada: Entrada,
@@ -105,7 +108,11 @@ fn novo_jogador(jogador: Player) -> Jogador {
   Jogador(
     jogador: jogador,
     pos: Vetor(int.to_float(q_x), int.to_float(q_y)),
+
+    // 3 vidas iniciais disponíveis
     vidas: [True, True, True],
+
+    // Pontuação inicial
     pontos: 0,
     recarga: 0,
     objetos: [],
@@ -396,54 +403,62 @@ pub fn smain() {
 pub fn desenhar(estado: Estado, player: Player) -> image.Image {
   case estado {
     Jogando(jogadores, _, _, objetos) ->
-      case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-        Ok(c) ->
-          // Base: fundo + orbs
-          let base = com_objetos(fundo(), objetos)
-
-          // Elementos de informação do jogador
-          let img_nome = nome_para_imagem(mworld.player_nickname(player))
-          let img_pontos = pontos_para_imagem(c.pontos)
-          let img_vidas = vidas_imagem(c.vidas)
-
-          // Posição relativa ao centro do jogador (pos.x, pos.y)
-          // Nome: acima do centro
-          let pos_nome_x = c.pos.x
-          let pos_nome_y = c.pos.y - 50.0
-
-          // Vidas: à esquerda do nome
-          let pos_vidas_x = c.pos.x - 70.0
-          let pos_vidas_y = c.pos.y - 50.0
-
-          // Pontos: à direita do nome
-          let pos_pontos_x = c.pos.x + 70.0
-          let pos_pontos_y = c.pos.y - 50.0
-
-          // Composição: base + elementos sobrepostos com posições
-          let com_vidas = image.place_imagef(
-            base,
-            pos_vidas_x,
-            pos_vidas_y,
-            img_vidas,
-          )
-
-          let com_pontos = image.place_imagef(
-            com_vidas,
-            pos_pontos_x,
-            pos_pontos_y,
-            img_pontos,
-          )
-
-          let resultado = image.place_imagef(
-            com_pontos,
-            pos_nome_x,
-            pos_nome_y,
-            img_nome,
-          )
-
-          resultado
-        Error(_) -> fundo()
-      }
+      desenhar_jogador(jogadores, player, objetos)
     _ -> fundo()
+  }
+}
+
+fn desenhar_jogador(
+  jogadores: List(Jogador),
+  player: Player,
+  objetos: List(Objeto),
+) -> image.Image {
+  case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
+    Ok(c) ->
+      // Base: fundo + orbs
+      let base = com_objetos(fundo(), objetos)
+
+      // Elementos de informação do jogador
+      let img_nome = nome_para_imagem(mworld.player_nickname(player))
+      let img_pontos = pontos_para_imagem(c.pontos)
+      let img_vidas = vidas_imagem(c.vidas)
+
+      // Posição relativa ao centro do jogador (pos.x, pos.y)
+      // Nome: acima do centro
+      let pos_nome_x = c.pos.x
+      let pos_nome_y = c.pos.y - 50.0
+
+      // Vidas: à esquerda do nome
+      let pos_vidas_x = c.pos.x - 70.0
+      let pos_vidas_y = c.pos.y - 50.0
+
+      // Pontos: à direita do nome
+      let pos_pontos_x = c.pos.x + 70.0
+      let pos_pontos_y = c.pos.y - 50.0
+
+      // Composição: base + elementos sobrepostos com posições
+      let com_vidas = image.place_imagef(
+        base,
+        pos_vidas_x,
+        pos_vidas_y,
+        img_vidas,
+      )
+
+      let com_pontos = image.place_imagef(
+        com_vidas,
+        pos_pontos_x,
+        pos_pontos_y,
+        img_pontos,
+      )
+
+      let resultado = image.place_imagef(
+        com_pontos,
+        pos_nome_x,
+        pos_nome_y,
+        img_nome,
+      )
+
+      resultado
+    Error(_) -> fundo()
   }
 }
