@@ -194,30 +194,20 @@ fn vida_para_imagem(vida: Bool) -> image.Image {
   }
 }
 
-// Converte a lista de vidas (3 booleans) em uma imagem horizontal de círculos.
-// Usa place_imagef para posicionar cada círculo separadamente.
-fn vidas_imagem(vidas: List(Bool)) -> image.Image {
-  // Assume-se que vidas sempre tem exatamente 3 elementos (inicializado como [True, True, True])
-  case vidas {
-    [v1, v2, v3] ->
-      image.place_imagef(
-        image.place_imagef(
-          image.place_imagef(
-            image.empty,
-            0.0,
-            0.0,
-            vida_para_imagem(v1),
-          ),
-          12.0,
-          0.0,
-          vida_para_imagem(v2),
-        ),
-        24.0,
-        0.0,
-        vida_para_imagem(v3),
-      )
-    _ -> image.empty
+// Converte um Objeto em imagem (círculo de acordo com o tipo)
+fn imagem_objeto(o: Objeto) -> image.Image {
+  case o.tipo {
+    OrbVerde -> image.circle(raio_orb, fill.green)
+    OrbVermelho -> image.circle(raio_orb, fill.red)
+    _ -> image.circle(raio_orb, fill.white)
   }
+}
+
+// Lista os objetos sobre uma base (fundo + orbs)
+fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
+  list.fold(objetos, base, fn(img, o) {
+    image.place_imagef(img, o.pos.x, o.pos.y, imagem_objeto(o))
+  })
 }
 
 // Desenha o texto da pontuação
@@ -426,15 +416,15 @@ fn desenhar_jogador(
       // Posição relativa ao centro do jogador (pos.x, pos.y)
       // Nome: acima do centro
       let pos_nome_x = c.pos.x
-      let pos_nome_y = c.pos.y -. 50.0
+      let pos_nome_y = c.pos.y - 50.0
 
       // Vidas: à esquerda do nome
-      let pos_vidas_x = c.pos.x -. 70.0
-      let pos_vidas_y = c.pos.y -. 50.0
+      let pos_vidas_x = c.pos.x - 70.0
+      let pos_vidas_y = c.pos.y - 50.0
 
       // Pontos: à direita do nome
-      let pos_pontos_x = c.pos.x +. 70.0
-      let pos_pontos_y = c.pos.y -. 50.0
+      let pos_pontos_x = c.pos.x + 70.0
+      let pos_pontos_y = c.pos.y - 50.0
 
       // Composição: base + elementos sobrepostos com posições
       let com_vidas = image.place_imagef(
@@ -458,7 +448,7 @@ fn desenhar_jogador(
         img_nome,
       )
 
-      resultado }
+      resultado
     Error(_) -> fundo()
   }
 }
