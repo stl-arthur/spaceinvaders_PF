@@ -270,24 +270,6 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image{
   }
 }
 
-// // Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
-// pub fn desenhar(estado: Estado, player: Player) -> image.Image {
-//   case estado {
-//     Jogando(jogadores, _, _, objetos) ->
-//       case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-//         Ok(c) ->
-//           com_objetos(fundo(), objetos)
-//           |> image.place_imagef(
-//             c.pos.x,
-//             c.pos.y,
-//             image.rotate(triangulo(c.jogador), c.angulo),
-//           )
-//         Error(_) -> fundo()
-//       }
-//     _ -> fundo()
-//   }
-// }
-
 // ---------------------------------------------------------------------------
 // Teclas: guardam quais direções estão seguradas
 // ---------------------------------------------------------------------------
