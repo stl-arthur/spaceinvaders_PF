@@ -414,7 +414,7 @@ fn desenhar_jogador(
   objetos: List(Objeto),
 ) -> image.Image {
   case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-    Ok(c) ->
+    Ok(c) -> {
       // Base: fundo + orbs
       let base = com_objetos(fundo(), objetos)
 
@@ -426,15 +426,15 @@ fn desenhar_jogador(
       // Posição relativa ao centro do jogador (pos.x, pos.y)
       // Nome: acima do centro
       let pos_nome_x = c.pos.x
-      let pos_nome_y = c.pos.y - 50.0
+      let pos_nome_y = c.pos.y -. 50.0
 
       // Vidas: à esquerda do nome
-      let pos_vidas_x = c.pos.x - 70.0
-      let pos_vidas_y = c.pos.y - 50.0
+      let pos_vidas_x = c.pos.x -. 70.0
+      let pos_vidas_y = c.pos.y -. 50.0
 
       // Pontos: à direita do nome
-      let pos_pontos_x = c.pos.x + 70.0
-      let pos_pontos_y = c.pos.y - 50.0
+      let pos_pontos_x = c.pos.x +. 70.0
+      let pos_pontos_y = c.pos.y -. 50.0
 
       // Composição: base + elementos sobrepostos com posições
       let com_vidas = image.place_imagef(
@@ -458,7 +458,7 @@ fn desenhar_jogador(
         img_nome,
       )
 
-      resultado
+      resultado }
     Error(_) -> fundo()
   }
 }
