@@ -1,11 +1,12 @@
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option}
 import sgleam/fill
 import sgleam/image
 import sgleam/key
 import sgleam/mworld.{type Player}
+import sgleam/style
 
 const largura_tela = 800
 
@@ -20,6 +21,10 @@ const deslocamento = 5
 const q_x = 400
 
 const q_y = 300
+
+// opacidade do outro jogador na tela de cada jogador
+
+const opacidade_f = 0.35 
 
 // 1 / raiz de 2: evita que a diagonal seja mais rápida que as outras direções
 const diagonal = 0.7
@@ -69,14 +74,11 @@ pub type Jogador {
   Jogador(
     jogador: Player,
     pos: Vetor,
-    // Vidas: lista de 3 booleans (True=viva, False=perdida)
-    vidas: List(Bool),
-    // Pontuação visível na tela
+    vida: Int,
     pontos: Int,
     recarga: Int,
     objetos: List(Objeto),
     tiros: List(Tiro),
-
     // novos: teclas seguradas e ângulo do triângulo
     // (graus, sentido anti-horário; 0 = apontando para cima)
     entrada: Entrada,
@@ -108,11 +110,7 @@ fn novo_jogador(jogador: Player) -> Jogador {
   Jogador(
     jogador: jogador,
     pos: Vetor(int.to_float(q_x), int.to_float(q_y)),
-
-    // 3 vidas iniciais disponíveis
-    vidas: [True, True, True],
-
-    // Pontuação inicial
+    vida: 100,
     pontos: 0,
     recarga: 0,
     objetos: [],
@@ -166,7 +164,7 @@ fn ainda_visivel(o: Objeto) -> Bool {
 }
 
 // ---------------------------------------------------------------------------
-// Desenho auxiliares
+// Desenho
 // ---------------------------------------------------------------------------
 
 fn fundo() -> image.Image {
@@ -174,27 +172,22 @@ fn fundo() -> image.Image {
 }
 
 // Jogador 1 é azul, os demais são vermelhos
-fn triangulo(p: Player) -> image.Image {
-  case mworld.player_index(p) {
-    1 -> image.triangle(40, fill.blue)
-    _ -> image.triangle(40, fill.red)
+fn triangulo(p: Player, opacidade: Float) -> image.Image {
+  let cor = case mworld.player_index(p) {
+    1 -> fill.blue
+    _ -> fill.red
   }
+  image.triangle(40, style.join([cor, fill.opacityf(opacidade)]))
+}
+
+fn nave(c: Jogador, opacidade: Float) -> image.Image{
+  image.rotate(triangulo(c.jogador, opacidade), c.angulo)
 }
 
 fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
   mworld.player_index(c.jogador) == mworld.player_index(player)
 }
 
-// Desenha um círculo representando uma vida.
-// True = vida disponível (verde), False = vida perdida (cinza)
-fn vida_para_imagem(vida: Bool) -> image.Image {
-  case vida {
-    True -> image.circle(5, fill.green)
-    False -> image.circle(5, fill.gray)
-  }
-}
-
-// Converte um Objeto em imagem (círculo de acordo com o tipo)
 fn imagem_objeto(o: Objeto) -> image.Image {
   case o.tipo {
     OrbVerde -> image.circle(raio_orb, fill.green)
@@ -203,56 +196,49 @@ fn imagem_objeto(o: Objeto) -> image.Image {
   }
 }
 
-// Converte a lista de vidas (3 booleans) em uma imagem horizontal de círculos.
-// True = vida disponível (verde), False = vida perdida (cinza)
-fn vidas_imagem(vidas: List(Bool)) -> image.Image {
-  // Assume-se que vidas sempre tem exatamente 3 elementos (inicializado como [True, True, True])
-  case vidas {
-    [v1, v2, v3] ->
-      image.place_imagef(
-        image.place_imagef(
-          image.place_imagef(
-            image.empty,
-            0.0,
-            0.0,
-            vida_para_imagem(v1),
-          ),
-          12.0,
-          0.0,
-          vida_para_imagem(v2),
-        ),
-        24.0,
-        0.0,
-        vida_para_imagem(v3),
-      )
-    _ -> image.empty
-  }
-}
-
-// Lista os objetos sobre uma base (fundo + orbs)
 fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
   list.fold(objetos, base, fn(img, o) {
     image.place_imagef(img, o.pos.x, o.pos.y, imagem_objeto(o))
   })
 }
 
-// Desenha o texto da pontuação
-fn pontos_para_imagem(pontos: Int) -> image.Image {
-  image.text(
-    int.to_string(pontos),
-    24,
-    fill.black,
-  )
+
+fn desenha_nave(cena: image.Image, c: Jogador, opacidade: Float) -> image.Image{
+  image.place_imagef(cena, c.pos.x, c.pos.y, nave(c, opacidade))
 }
 
-// Desenha o texto do nome do jogador
-fn nome_para_imagem(nome: String) -> image.Image {
-  image.text(
-    nome,
-    20,
-    fill.white,
-  )
+pub fn desenhar(estado: Estado, player: Player) -> image.Image{
+  case estado{
+    Jogando(jogadores, _, _, objetos) -> {
+      let outros = list.filter(jogadores, fn(c) { !eh_do_jogador(c, player)})
+      let meus = list.filter(jogadores, fn(c) {eh_do_jogador(c, player)})
+      let cena = 
+        list.fold(outros, com_objetos(fundo(), objetos), fn(cena, c){
+          desenha_nave(cena, c, opacidade_f)
+        })
+        list.fold(meus, cena, fn(cena, c) {desenha_nave(cena, c, 1.0)})
+    }
+    _ -> fundo()
+  }
 }
+
+// // Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
+// pub fn desenhar(estado: Estado, player: Player) -> image.Image {
+//   case estado {
+//     Jogando(jogadores, _, _, objetos) ->
+//       case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
+//         Ok(c) ->
+//           com_objetos(fundo(), objetos)
+//           |> image.place_imagef(
+//             c.pos.x,
+//             c.pos.y,
+//             image.rotate(triangulo(c.jogador), c.angulo),
+//           )
+//         Error(_) -> fundo()
+//       }
+//     _ -> fundo()
+//   }
+// }
 
 // ---------------------------------------------------------------------------
 // Teclas: guardam quais direções estão seguradas
@@ -316,7 +302,7 @@ pub fn tecla_solta(estado: Estado, player: Player, evento: key.Event) -> Estado 
   muda_tecla(estado, player, evento, False)
 }
 
-fn limita(v: Float, min: Float, max: Float) -> Float {
+pub fn limita(v: Float, min: Float, max: Float) -> Float {
   float.max(min, float.min(v, max))
 }
 
@@ -402,7 +388,7 @@ pub fn tick(estado: Estado) -> Estado {
 
 pub fn smain() {
   mworld.create_from(
-    fn(_, jogadores) { inicial(jogadores) },
+    fn(_, jogadores) { inicial(jogadores) }
     min: 2,
     max: 2,
     to_image: desenhar,
@@ -410,71 +396,4 @@ pub fn smain() {
   |> mworld.on_key_down(tecla_pressionada)
   |> mworld.on_key_up(tecla_solta)
   |> mworld.on_tick(tick)
-}
-
-// ---------------------------------------------------------------------------
-// Exibição no canvas - cada jogador vê seu próprio painel
-// ---------------------------------------------------------------------------
-
-pub fn desenhar(estado: Estado, player: Player) -> image.Image {
-  case estado {
-    Jogando(jogadores, _, _, objetos) ->
-      desenhar_jogador(jogadores, player, objetos)
-    _ -> fundo()
-  }
-}
-
-fn desenhar_jogador(
-  jogadores: List(Jogador),
-  player: Player,
-  objetos: List(Objeto),
-) -> image.Image {
-  case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-    Ok(c) -> {
-      // Base: fundo + orbs
-      let base = com_objetos(fundo(), objetos)
-
-      // Elementos de informação do jogador
-      let img_nome = nome_para_imagem(mworld.player_nickname(player))
-      let img_pontos = pontos_para_imagem(c.pontos)
-      let img_vidas = vidas_imagem(c.vidas)
-
-      // Posição relativa ao centro do jogador (pos.x, pos.y)
-      // Nome: acima do centro
-      let pos_nome_x = c.pos.x
-      let pos_nome_y = c.pos.y - 50.0
-
-      // Vidas: à esquerda do nome
-      let pos_vidas_x = c.pos.x - 70.0
-      let pos_vidas_y = c.pos.y - 50.0
-
-      // Pontos: à direita do nome
-      let pos_pontos_x = c.pos.x + 70.0
-      let pos_pontos_y = c.pos.y - 50.0
-
-      // Composição: base + elementos sobrepostos com posições
-      let com_vidas = image.place_imagef(
-        base,
-        pos_vidas_x,
-        pos_vidas_y,
-        img_vidas,
-      )
-
-      let com_pontos = image.place_imagef(
-        com_vidas,
-        pos_pontos_x,
-        pos_pontos_y,
-        img_pontos,
-      )
-
-      let resultado = image.place_imagef(
-        com_pontos,
-        pos_nome_x,
-        pos_nome_y,
-        img_nome,
-      )
-
-      resultado
-    Error(_) -> fundo()
-  }
 }
