@@ -203,6 +203,32 @@ fn imagem_objeto(o: Objeto) -> image.Image {
   }
 }
 
+// Converte a lista de vidas (3 booleans) em uma imagem horizontal de círculos.
+// True = vida disponível (verde), False = vida perdida (cinza)
+fn vidas_imagem(vidas: List(Bool)) -> image.Image {
+  // Assume-se que vidas sempre tem exatamente 3 elementos (inicializado como [True, True, True])
+  case vidas {
+    [v1, v2, v3] ->
+      image.place_imagef(
+        image.place_imagef(
+          image.place_imagef(
+            image.empty,
+            0.0,
+            0.0,
+            vida_para_imagem(v1),
+          ),
+          12.0,
+          0.0,
+          vida_para_imagem(v2),
+        ),
+        24.0,
+        0.0,
+        vida_para_imagem(v3),
+      )
+    _ -> image.empty
+  }
+}
+
 // Lista os objetos sobre uma base (fundo + orbs)
 fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
   list.fold(objetos, base, fn(img, o) {
