@@ -6,6 +6,7 @@ import sgleam/fill
 import sgleam/image
 import sgleam/key
 import sgleam/mworld.{type Player}
+import sgleam/style
 import sgleam/xplace
 import sgleam/yplace
 
@@ -23,6 +24,10 @@ const q_x = 400
 
 const q_y = 300
 
+// opacidade do outro jogador na tela de cada jogador
+
+const opacidade_f = 0.35
+
 // 1 / raiz de 2: evita que a diagonal seja mais rápida que as outras direções
 const diagonal = 0.7
 
@@ -39,6 +44,24 @@ const y_inicial = -10.0
 
 // pixels por tick que o orbe desce (menor que o `deslocamento` do jogador)
 const velocidade_orb = 2.0
+
+// um asteroide novo a cada 0.5 segundos (0.5 * 28 ticks por segundo)
+const intervalo_ast = 14
+
+// borda esquerda/direita para o x do asteroide (Int)
+const margem_ast = 20
+
+const altura_geodo = 20
+
+const largura_geodo = 20
+
+// (estas duas não estavam no arquivo, mas o código as usa; ajuste se quiser)
+const altura_destroco = 18
+
+const largura_destroco = 18
+
+// pixels por tick que o asteroide desce (maior que o 'deslocamento' do jogador)
+const velocidade_ast = 7
 
 // Cada posição é uma vida: True = disponível, False = perdida
 const vidas_iniciais = [True, True, True]
@@ -180,8 +203,22 @@ fn proximo(seed: Int) -> Int {
   { seed * 16_807 } % 2_147_483_647
 }
 
-// Devolve um orbe verde ou vermelho com x aleatório, y fixo no alto e descendo,
-// mais a nova seed
+fn gera_a_cada(
+  intervalo: Int,
+  tique: Int,
+  seed: Int,
+  objetos: List(Objeto),
+  gera: fn(Int) -> #(Objeto, Int),
+) -> #(List(Objeto), Int) {
+  case tique % intervalo == 0 {
+    True -> {
+      let #(o, seed) = gera(seed)
+      #([o, ..objetos], seed)
+    }
+    False -> #(objetos, seed)
+  }
+}
+
 fn gera_orb(seed: Int) -> #(Objeto, Int) {
   let s1 = proximo(seed)
   let s2 = proximo(s1)
@@ -202,58 +239,30 @@ fn move_objeto(o: Objeto) -> Objeto {
 }
 
 fn ainda_visivel(o: Objeto) -> Bool {
-  o.pos.y <. int.to_float(altura_tela + raio_orb)
-}
-
-// ---------------------------------------------------------------------------
-// Desenho
-// ---------------------------------------------------------------------------
-
-fn fundo() -> image.Image {
-  image.rectangle(largura_tela, altura_tela, fill.black)
-}
-
-// Jogador 1 é azul, os demais são vermelhos
-fn triangulo(p: Player) -> image.Image {
-  case mworld.player_index(p) {
-    1 -> image.triangle(40, fill.blue)
-    _ -> image.triangle(40, fill.red)
+  let tamanho = case o.tipo {
+    Geodo -> altura_geodo
+    Destroco -> altura_destroco
+    _ -> raio_orb
   }
+  o.pos.y <. int.to_float(altura_tela + tamanho)
 }
 
-fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
-  mworld.player_index(c.jogador) == mworld.player_index(player)
-}
-
-fn imagem_objeto(o: Objeto) -> image.Image {
-  case o.tipo {
-    OrbVerde -> image.circle(raio_orb, fill.green)
-    OrbVermelho -> image.circle(raio_orb, fill.red)
-    _ -> image.circle(raio_orb, fill.white)
+fn gera_ast(seed: Int) -> #(Objeto, Int) {
+  let s1 = proximo(seed)
+  let s2 = proximo(s1)
+  let x = margem_ast + s1 % { largura_tela - 2 * margem_ast }
+  let tipo = case s2 % 2 {
+    0 -> Geodo
+    _ -> Destroco
   }
-}
-
-fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
-  list.fold(objetos, base, fn(img, o) {
-    image.place_imagef(img, o.pos.x, o.pos.y, imagem_objeto(o))
-  })
-}
-
-// O tiro tem a cor do triângulo de quem atirou
-fn imagem_tiro(p: Player) -> image.Image {
-  case mworld.player_index(p) {
-    1 -> image.circle(raio_tiro, fill.blue)
-    _ -> image.circle(raio_tiro, fill.red)
-  }
-}
-
-// Tiros de todos os jogadores (o mundo é compartilhado)
-fn com_tiros(base: image.Image, jogadores: List(Jogador)) -> image.Image {
-  list.fold(jogadores, base, fn(img, j) {
-    list.fold(j.tiros, img, fn(img2, t) {
-      image.place_imagef(img2, t.pos.x, t.pos.y, imagem_tiro(j.jogador))
-    })
-  })
+  #(
+    Objeto(
+      tipo,
+      Vetor(int.to_float(x), y_inicial),
+      Vetor(0.0, int.to_float(velocidade_ast)),
+    ),
+    s2,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -322,23 +331,83 @@ fn com_hud(base: image.Image, jogadores: List(Jogador)) -> image.Image {
   })
 }
 
-// Cada jogador enxerga só o próprio triângulo; ele gira conforme a direção.
-// Objetos e tiros são do mundo compartilhado. O HUD mostra todos os jogadores.
+// ---------------------------------------------------------------------------
+// Desenho
+// ---------------------------------------------------------------------------
+
+fn fundo() -> image.Image {
+  image.rectangle(largura_tela, altura_tela, fill.black)
+}
+
+// Jogador 1 é azul, os demais são vermelhos
+fn triangulo(p: Player, opacidade: Float) -> image.Image {
+  let cor = case mworld.player_index(p) {
+    1 -> fill.blue
+    _ -> fill.red
+  }
+  image.triangle(40, style.join([cor, fill.opacityf(opacidade)]))
+}
+
+fn nave(c: Jogador, opacidade: Float) -> image.Image {
+  image.rotate(triangulo(c.jogador, opacidade), c.angulo)
+}
+
+fn eh_do_jogador(c: Jogador, player: Player) -> Bool {
+  mworld.player_index(c.jogador) == mworld.player_index(player)
+}
+
+fn imagem_objeto(o: Objeto) -> image.Image {
+  case o.tipo {
+    OrbVerde -> image.circle(raio_orb, fill.green)
+    OrbVermelho -> image.circle(raio_orb, fill.red)
+    Geodo -> image.rectangle(largura_geodo, altura_geodo, fill.brown)
+    Destroco -> image.rectangle(largura_destroco, altura_destroco, fill.grey)
+    Inimigo -> image.rectangle(30, 20, fill.red)
+  }
+}
+
+fn com_objetos(base: image.Image, objetos: List(Objeto)) -> image.Image {
+  list.fold(objetos, base, fn(img, o) {
+    image.place_imagef(img, o.pos.x, o.pos.y, imagem_objeto(o))
+  })
+}
+
+// O tiro tem a cor do triângulo de quem atirou
+fn imagem_tiro(p: Player) -> image.Image {
+  case mworld.player_index(p) {
+    1 -> image.circle(raio_tiro, fill.blue)
+    _ -> image.circle(raio_tiro, fill.red)
+  }
+}
+
+// Tiros de todos os jogadores (o mundo é compartilhado)
+fn com_tiros(base: image.Image, jogadores: List(Jogador)) -> image.Image {
+  list.fold(jogadores, base, fn(img, j) {
+    list.fold(j.tiros, img, fn(img2, t) {
+      image.place_imagef(img2, t.pos.x, t.pos.y, imagem_tiro(j.jogador))
+    })
+  })
+}
+
+fn desenha_nave(cena: image.Image, c: Jogador, opacidade: Float) -> image.Image {
+  image.place_imagef(cena, c.pos.x, c.pos.y, nave(c, opacidade))
+}
+
 pub fn desenhar(estado: Estado, player: Player) -> image.Image {
   case estado {
-    Jogando(jogadores, _, _, objetos) ->
-      case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-        Ok(c) ->
-          com_objetos(fundo(), objetos)
-          |> com_tiros(jogadores)
-          |> image.place_imagef(
-            c.pos.x,
-            c.pos.y,
-            image.rotate(triangulo(c.jogador), c.angulo),
-          )
-          |> com_hud(jogadores)
-        Error(_) -> fundo()
-      }
+    Jogando(jogadores, _, _, objetos) -> {
+      let outros = list.filter(jogadores, fn(c) { !eh_do_jogador(c, player) })
+      let meus = list.filter(jogadores, fn(c) { eh_do_jogador(c, player) })
+      let cena =
+        list.fold(
+          outros,
+          com_tiros(com_objetos(fundo(), objetos), jogadores),
+          fn(cena, c) { desenha_nave(cena, c, opacidade_f) },
+        )
+
+      list.fold(meus, cena, fn(cena, c) { desenha_nave(cena, c, 1.0) })
+      |> com_hud(jogadores)
+    }
     _ -> fundo()
   }
 }
@@ -571,8 +640,14 @@ fn colide(a: Vetor, ra: Float, b: Vetor, rb: Float) -> Bool {
   dx *. dx +. dy *. dy <=. r *. r
 }
 
-fn raio_objeto() -> Float {
-  int.to_float(raio_orb)
+// Raio de colisão de cada objeto: metade do maior lado do que é desenhado
+fn raio_objeto(tipo: TipoObjeto) -> Float {
+  case tipo {
+    Geodo -> int.to_float(largura_geodo) /. 2.0
+    Destroco -> int.to_float(largura_destroco) /. 2.0
+    Inimigo -> 15.0
+    OrbVerde | OrbVermelho -> int.to_float(raio_orb)
+  }
 }
 
 fn raio_do_tiro() -> Float {
@@ -601,7 +676,7 @@ fn jogador_contra_objetos(
   let #(j, restantes) =
     list.fold(objetos, #(j, []), fn(acc, o) {
       let #(j, restantes) = acc
-      case colide(j.pos, raio_jogador, o.pos, raio_objeto()) {
+      case colide(j.pos, raio_jogador, o.pos, raio_objeto(o.tipo)) {
         True -> #(efeito_do_contato(j, o.tipo), restantes)
         False -> #(j, [o, ..restantes])
       }
@@ -632,7 +707,7 @@ fn tiro_contra_objetos(
   case objetos {
     [] -> #(Error(Nil), [])
     [o, ..resto] ->
-      case colide(t.pos, raio_do_tiro(), o.pos, raio_objeto()) {
+      case colide(t.pos, raio_do_tiro(), o.pos, raio_objeto(o.tipo)) {
         True -> #(Ok(o), resto)
         False -> {
           let #(achado, resto) = tiro_contra_objetos(t, resto)
@@ -711,7 +786,7 @@ fn colisoes_tiros(
 }
 
 // ---------------------------------------------------------------------------
-// Tick
+// Atualização principal do tick
 // ---------------------------------------------------------------------------
 
 pub fn tick(estado: Estado) -> Estado {
@@ -722,27 +797,31 @@ pub fn tick(estado: Estado) -> Estado {
         |> list.map(passo)
         |> list.map(atualiza_tiros)
         |> list.map(atualiza_efeito)
-      let objetos =
+
+      // Move objetos
+      let objetos_mov =
         objetos
         |> list.map(move_objeto)
         |> list.filter(ainda_visivel)
-      let #(jogadores, objetos) = colisoes_tiros(jogadores, objetos)
-      let #(jogadores, objetos) = colisoes_jogadores(jogadores, objetos)
-      let tique = tique + 1
-      case tique % intervalo_spawn == 0 {
-        True -> {
-          let #(orb, seed) = gera_orb(seed)
-          Jogando(jogadores, tique, seed, [orb, ..objetos])
-        }
-        False -> Jogando(jogadores, tique, seed, objetos)
-      }
+
+      // Colisões: primeiro os tiros, depois o contato com os jogadores
+      let #(jogadores, objetos_mov) = colisoes_tiros(jogadores, objetos_mov)
+      let #(jogadores, objetos_mov) = colisoes_jogadores(jogadores, objetos_mov)
+
+      // Gera asteroides e orbes
+      let #(objetos_novos, seed) =
+        gera_a_cada(intervalo_ast, tique, seed, objetos_mov, gera_ast)
+      let #(objetos_finais, seed) =
+        gera_a_cada(intervalo_spawn, tique, seed, objetos_novos, gera_orb)
+
+      Jogando(jogadores, tique + 1, seed, objetos_finais)
     }
     _ -> estado
   }
 }
 
 // ---------------------------------------------------------------------------
-// Jogo
+// Jogo entry point
 // ---------------------------------------------------------------------------
 
 pub fn smain() {
