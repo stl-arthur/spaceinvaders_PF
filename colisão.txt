@@ -1,0 +1,10 @@
+A colisão funcioanra da seguinte forma, o jogador colidir com um geodo, inimigo ou asteroid, ou qualquer outro inimigo, ele deve
+perder uma vida, se ele colidir com um orb: se o orb for verde recupera uma vida, se o orb for vermelho durante 30 segundos
+o jogador inimigo ganhara menos pontos por destruir asteroids. Tambem preciso que o tiro colida com os asteroids e os jogadores e os ]
+inimigos como esta deacrito abaixo:
+
+Os tiros funcionarão da segunte forma, cada jogador tera tiros infinitos e os tiros vão na direção que o jogador esta virado até 
+a borda da tela, se não colidirem em nada, se o tiro colidir com um orb nada acontece, se o tiro colidir com um asteroid, o asteroid
+soma 50 pontos aos seus pontos, se o tiro atingir um inimigo o jogador ganhara 100 pontos, o tiro não interaje com o outro jogador, 
+se for possivel, se o tiro colidir com o outro jogador, o tiro simplesmente desaparece, cmomo se o jogador bloqueasse o tiro direção
+jogador inimigo.

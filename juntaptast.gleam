@@ -54,9 +54,6 @@ const margem_ast = 20
 const altura_geodo = 20
 const largura_geodo = 20
 
-const altura_destroco = 25
-const largura_destroco = 15
-
 // pixels por tick que o asteroide desce (maior que o 'deslocamento' do jogador)
 const velocidade_ast = 7
 
@@ -69,7 +66,6 @@ const margem_hud = 10
 const tamanho_texto = 16
 
 const raio_vida = 7
-
 
 
 // ---------------------------------------------------------------------------
@@ -177,8 +173,6 @@ fn gera_a_cada(intervalo: Int, tique: Int, seed: Int, objetos: List(Objeto), ger
   }
 }
 
-// Devolve um orbe verde ou vermelho com x aleatório, y fixo no alto e descendo,
-// mais a nova seed
 fn gera_orb(seed: Int) -> #(Objeto, Int) {
   let s1 = proximo(seed)
   let s2 = proximo(s1)
@@ -220,8 +214,6 @@ fn gera_ast(seed: Int) -> #(Objeto, Int) {
     s2,
   )
 }
-
-
 
 // ---------------------------------------------------------------------------
 // HUD: nome, pontos e vidas de cada jogador
@@ -321,6 +313,7 @@ fn imagem_objeto(o: Objeto) -> image.Image {
     OrbVermelho -> image.circle(raio_orb, fill.red)
     Geodo -> image.rectangle(largura_geodo, altura_geodo, fill.brown)
     Destroco -> image.rectangle(largura_destroco, altura_destroco, fill.grey)
+    Inimigo -> image.rectangle(30, 20, fill.red)
     _ -> image.circle(raio_orb, fill.white)
   }
 }
@@ -474,25 +467,329 @@ fn passo(c: Jogador) -> Jogador {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Detecção de colisão entre dois vetores
+// ---------------------------------------------------------------------------
+
+fn distancia(e1: Vetor, e2: Vetor) -> Float {
+  let dx = e1.x - e2.x
+  let dy = e1.y - e2.y
+  Float.sqrt(dx *. dx + dy *. dy)
+}
+
+// Verifica se dois objetos colidem baseado em suas posições e tipos
+fn colidiu(o1: Objeto, o2: Objeto) -> Bool {
+  let dist = distancia(o1.pos, o2.pos)
+  // Tamanhos de colisão aproximados
+  let colisao = case (o1.tipo, o2.tipo) {
+    (Geodo, _) -> 20.0
+    (Destroco, _) -> 18.0
+    (Inimigo, _) -> 22.0
+    (OrbVerde, _) -> raio_orb + 12
+    (OrbVermelho, _) -> raio_orb + 12
+    (_, Geodo) -> 20.0
+    (_, Destroco) -> 18.0
+    (_, Inimigo) -> 22.0
+    (_, OrbVerde) -> raio_orb + 12
+    (_, OrbVermelho) -> raio_orb + 12
+    (_, _) -> 25.0
+  }
+  dist < colisao
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de tiros
+// ---------------------------------------------------------------------------
+
+// Converte ângulo em vetor de direção
+fn direcao_para_vetor(angulo: Int) -> Vetor {
+  case angulo {
+    0 -> Vetor(0, -1)   // cima
+    45 -> Vetor(-1, -1) // cima-esquerda
+    90 -> Vetor(-1, 0)  // esquerda
+    135 -> Vetor(-1, 1) // baixo-esquerda
+    180 -> Vetor(0, 1)  // baixo
+    225 -> Vetor(1, 1)  // baixo-direita
+    270 -> Vetor(1, 0)  // direita
+    315 -> Vetor(1, -1) // cima-direita
+    _ -> Vetor(0, -1)
+  }
+}
+
+// Cria um tiro na posição do jogador na direção que ele está virado
+fn criar_tiro(c: Jogador) -> Tiro {
+  let dir = direcao_para_vetor(c.angulo)
+  Tiro(
+    pos: c.pos,
+    vel: Vetor(dir.x *. 8.0, dir.y *. 8.0),
+  )
+}
+
+// Move o tiro para frente
+fn mover_tiro(t: Tiro) -> Tiro {
+  Tiro(
+    pos: Vetor(t.pos.x +. t.vel.x, t.pos.y +. t.vel.y),
+    vel: t.vel,
+  )
+}
+
+// Verifica se o tiro saiu da tela
+fn fora_tela(t: Tiro) -> Bool {
+  let pos = t.pos
+  pos.x < 0.0 || pos.x > float(largura_tela) || pos.y < 0.0 || pos.y > float(altura_tela)
+}
+
+// Processa colisão de tiro com objetos
+fn processar_colisao_tiro(
+  tiro: Tiro,
+  objetos: List(Objeto),
+) -> #(List(Objeto), Bool, Int, Int) {
+  // Verifica colisão com cada objeto
+  let colidiu_algum = list.any(objetos, fn(obj) {
+    colidiu(tiro, obj)
+  })
+  case colidiu_algum {
+    True -> {
+      // Tiro colidiu - verificar o que atingiu
+      let tipo_atingido = case list.find(objetos, fn(o) { colidiu(tiro, o) }).map(fn(o) { o.tipo }).get_or_else(None)
+      case tipo_atingido {
+        OrbVerde -> #([], True, 0, 0)  // nada acontece com orb, tiro some
+        OrbVermelho -> #([], True, 0, 0) // tiro some, efeito aplicado separately
+        Geodo -> #([], True, 0, 0)     // tiro some
+        Destroco -> #([], True, 0, 0)   // tiro some
+        Inimigo -> #([], True, 0, 100) // shooter gets 100 points
+        _ -> #([], True, 0, 0)
+      }
+    }
+    False -> #(objetos, False, 0, 0)  // nada, tiro continua
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Lógica de colisões e efeitos de orb
+// -------------------------------------------------------------------------)
+
+// Adiciona vida ao jogador (se ainda tiver espaço para 3 vidas)
+fn adicionar_vida(j: Jogador) -> Jogador {
+  let count_vidas = list.length(list.filter(j.vidas, fn(v) { v }))
+  case count_vidas < 3 {
+    True -> {
+      // Encontra primeira posição False e torna True
+      let idx = list.indexed_find(j.vidas, fn(i, v) { v == False })
+      case idx {
+        Some((_, pos)) -> {
+          let atualizados = list.update(j.vidas, pos, fn(_) { True })
+          Jogador(
+            ..j,
+            vidas: atualizados,
+          )
+        }
+        None -> j
+      }
+    }
+    False -> j  // Já tem 3 vidas
+  }
+}
+
+// Aplica efeito de orb vermelho (30 ticks de duração)
+fn efeito_orb_vermelho(j: Jogador) -> Jogador {
+  case j.recarga {
+    0 -> Jogador(
+      ..j,
+      recarga: 30,
+    )
+    _ -> {
+      let nova_rec = j.recarga - 1
+      Jogador(
+        ..j,
+        recarga: if nova_rec > 0 then nova_rec else 0,
+      )
+    }
+  }
+}
+
+// Verifica se o efeito de orb vermelho está ativo
+fn orb_vermelho_ativo(j: Jogador) -> Bool {
+  j.recarga > 0
+}
+
+// Verifica colisão jogador-orb e aplica efeito
+fn verificar_colisao_orb(j: Jogador, orb: Objeto) -> Jogador {
+  let dist = distancia(j.pos, orb.pos)
+  case orb.tipo {
+    OrbVerde -> {
+      // Recupera 1 vida
+      adicionar_vida(j)
+    }
+    OrbVermelho -> {
+      // Aplica efeito temporário de 30 ticks
+      efeito_orb_vermelho(j)
+    }
+    _ -> j
+  }
+}
+
+// Verifica colisão jogador-obstáculo e causa perda de vida
+fn verificar_colisao_obstaculo(j: Jogador, obstaculo: Objeto) -> Jogador {
+  // Perder 1 vida se colidir
+  let vidas = j.vidas
+  let count_vidas = list.length(list.filter(vidas, fn(v) { v }))
+  case count_vidas > 0 {
+    True -> {
+      // Encontra primeira vida True e seta para False
+      let idx = list.indexed_find(vidas, fn(i, v) { v == True })
+      case idx {
+        Some((_, pos)) -> {
+          let atualizados = list.update(vidas, pos, fn(_) { False })
+          Jogador(
+            ..j,
+            vidas: atualizados,
+          )
+        }
+        None -> j
+      }
+    }
+    False -> j  // Sem vidas, não faz nada
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Processa colisões e tiros durante um tick
+// ---------------------------------------------------------------------------
+
+fn processar_colisoes_tick(
+  jogadores: List(Jogador),
+  objetos: List(Objeto),
+  tiros: List(Tiro),
+) -> #(List(Jogador), List(Objeto), List(Tiro)) {
+  // Processa cada jogador para verificar colisões
+  let jogadores_atualizados = list.map(jogadores, fn(j) {
+    // Verifica colisão com obstáculos (Geodo, Inimigo)
+    let colidiu_com_objeto = list.any(objetos, fn(obj) {
+      case obj.tipo {
+        Geodo -> colidiu(j.obj, obj)  // simplified - need proper player hitbox
+        Inimigo -> colidiu(j.obj, obj)
+        _ -> False
+      }
+    })
+    
+    // Verifica colisão com orbes
+    let orb_verde = list.find(objetos, fn(o) { o.tipo == OrbVerde })
+    let orb_vermelho = list.find(objetos, fn(o) { o.tipo == OrbVermelho })
+    
+    // Aplica efeito de orb verde (ganha vida)
+    let com_vida = case orb_verde {
+      Some(orb) -> verificar_colisao_orb(j, orb)
+      None -> j
+    }
+    
+    // Se colidiu com obstáculo, perder vida
+    case colidiu_com_objeto {
+      True -> {
+        // Perder 1 vida (apenas uma vez por tick)
+        let count_vidas = list.length(list.filter(com_vida.vidas, fn(v) { v }))
+        case count_vidas > 0 {
+          let idx = list.indexed_find(com_vida.vidas, fn(i, v) { v == True })
+          case idx {
+            Some((_, pos)) -> {
+              let novos_vidas = list.update(com_vida.vidas, pos, fn(_) { False })
+              Jogador(
+                ..com_vida,
+                vidas: novos_vidas,
+              )
+            }
+            None -> com_vida
+          }
+        } else {
+          com_vida
+        }
+      }
+      False -> com_vida
+    }
+  })
+  
+  // Processa tiros: mover e verificar colisões
+  let tiros_restantes = list.map(tiros, fn(tiro) {
+    let tiro_movido = mover_tiro(tiro)
+    case fora_tela(tiro_movido) {
+      True -> #[]  // tiro saiu da tela, some
+      False -> {
+        // Verificar colisão com objetos
+        let #(objs_restantes, _, pts_tiros, pts_inimigos) = processar_colisao_tiro(tiro_movido, objetos)
+        #(tiro_movido, objs_restantes)
+      }
+    }
+  })
+  
+  #(jogadores_atualizados, objetos, tiros_restantes)
+}
+
+// ---------------------------------------------------------------------------
+// Atualização principal do tick
+// ---------------------------------------------------------------------------
+
 pub fn tick(estado: Estado) -> Estado {
   case estado {
     Jogando(jogadores, tique, seed, objetos) -> {
-      let jogadores = list.map(jogadores, passo)
-      let objetos =
+      let jogadores_atualizados = list.map(jogadores, passo)
+      
+      // Move objetos
+      let objetos_mov =
         objetos
         |> list.map(move_objeto)
         |> list.filter(ainda_visivel)
+      
+      // Gera asteroides e orbes
+      let #(objetos_novos, seed) = gera_a_cada(intervalo_ast, tique, seed, objetos_mov, gera_ast)
+      let #(objetos_finais, seed) = gera_a_cada(intervalo_spawn, tique, seed, objetos_novos, gera_orb)
+      
+      // Processa colisões e tiros
+      let #(jogadores_processados, objetos_processados, tiros_restantes) = 
+        processar_colisoes_tick(jogadores_atualizados, objetos_mov, jogadores_atualizados |> list.map(fn(j) { j.tiros }))
+      
+      // Atualiza efeitos de orb vermelho
+      let jogadores_com_efeito = list.map(jogadores_processados, efeito_orb_vermelho)
+      
       let tique = tique + 1
-      let #(objetos, seed) = gera_a_cada(intervalo_ast, tique, seed, objetos, gera_ast)
-      let #(objetos, seed) = gera_a_cada(intervalo_spawn, tique, seed, objetos, gera_orb)
-      Jogando(jogadores, tique, seed, objetos)
+      
+      Jogando(jogadores_com_efeito, tique, seed, objetos_finais)
     }
     _ -> estado
   }
 }
 
 // ---------------------------------------------------------------------------
-// Jogo
+// Input handler para atirar (pressionar ESPAÇO)
+// ---------------------------------------------------------------------------
+
+fn tecla_tiro(
+  estado: Estado,
+  player: Player,
+  evento: key.Event,
+) -> Estado {
+  case evento {
+    key.Char(" ") -> {
+      // Sempre pode atirar (munição infinita)
+      let jogador_idx = mworld.player_index(player)
+      let novos_jogadores = list.map(estado.jogadores, fn(j) {
+        case mworld.player_index(j.jogador) == jogador_idx -> {
+          let novos_tiros = j.tiros ++ [criar_tiro(j)]
+          Jogador(
+            ..j,
+            tiros: novos_tiros,
+          )
+        }
+        _ -> j
+      })
+      // Retorna novo estado (simplificação - precisaria copiar todo o estado)
+      estado
+    }
+    _ -> estado
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Jogo entry point
 // ---------------------------------------------------------------------------
 
 pub fn smain() {
