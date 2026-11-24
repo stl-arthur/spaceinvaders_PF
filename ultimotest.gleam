@@ -43,6 +43,22 @@ const y_inicial = -10.0
 // pixels por tick que o orbe desce (menor que o `deslocamento` do jogador)
 const velocidade_orb = 2.0
 
+// um asteroide novo a cada 0.5 segundos (0.5 * 28 ticks por segundo)
+const intervalo_ast = 14
+
+// borda esquerda/direita para o x do asteroide (Int)
+const margem_ast = 20
+
+const altura_geodo = 20
+const largura_geodo = 20
+
+const altura_destroco = 25
+const largura_destroco = 15
+
+// pixels por tick que o asteroide desce (maior que o 'deslocamento' do jogador)
+const velocidade_ast = 7
+
+
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
 // ---------------------------------------------------------------------------
@@ -138,6 +154,16 @@ fn proximo(seed: Int) -> Int {
   { seed * 16_807 } % 2_147_483_647
 }
 
+fn gera_a_cada(intervalo: Int, tique: Int, seed: Int, objetos: List(Objeto), gera: fn(Int) -> #(Objeto, Int),) -> #(List(Objeto), Int){
+  case tique % intervalo == 0{
+    True -> {
+      let #(o, seed) = gera(seed)
+      #([o, ..objetos], seed)
+    }
+    False -> #(objetos, seed)
+  }
+}
+
 // Devolve um orbe verde ou vermelho com x aleatório, y fixo no alto e descendo,
 // mais a nova seed
 fn gera_orb(seed: Int) -> #(Objeto, Int) {
@@ -160,8 +186,28 @@ fn move_objeto(o: Objeto) -> Objeto {
 }
 
 fn ainda_visivel(o: Objeto) -> Bool {
-  o.pos.y <. int.to_float(altura_tela + raio_orb)
+  let tamanho = case o.tipo {
+    Geodo -> altura_geodo
+    Destroco -> altura_destroco
+    _ -> raio_orb
+  }
+  o.pos.y <. int.to_float(altura_tela + tamanho)
 }
+
+fn gera_ast(seed: Int) -> #(Objeto, Int) {
+  let s1 = proximo(seed)
+  let s2 = proximo(s1)
+  let x = margem_ast + s1 % { largura_tela - 2 * margem_ast }
+  let tipo = case s2 % 2 {
+    0 -> Geodo
+    _ -> Destroco
+  }
+  #(
+    Objeto(tipo, Vetor(int.to_float(x), y_inicial), Vetor(0.0, int.to_float(velocidade_ast))),
+    s2,
+  )
+}
+
 
 // ---------------------------------------------------------------------------
 // Desenho
@@ -192,6 +238,8 @@ fn imagem_objeto(o: Objeto) -> image.Image {
   case o.tipo {
     OrbVerde -> image.circle(raio_orb, fill.green)
     OrbVermelho -> image.circle(raio_orb, fill.red)
+    Geodo -> image.rectangle(largura_geodo, altura_geodo, fill.brown)
+    Destroco -> image.rectangle(largura_destroco, altura_destroco, fill.grey)
     _ -> image.circle(raio_orb, fill.white)
   }
 }
@@ -221,24 +269,6 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image{
     _ -> fundo()
   }
 }
-
-// // Cada jogador enxerga só o próprio Jogador; o triângulo gira conforme a direção
-// pub fn desenhar(estado: Estado, player: Player) -> image.Image {
-//   case estado {
-//     Jogando(jogadores, _, _, objetos) ->
-//       case list.find(jogadores, fn(c) { eh_do_jogador(c, player) }) {
-//         Ok(c) ->
-//           com_objetos(fundo(), objetos)
-//           |> image.place_imagef(
-//             c.pos.x,
-//             c.pos.y,
-//             image.rotate(triangulo(c.jogador), c.angulo),
-//           )
-//         Error(_) -> fundo()
-//       }
-//     _ -> fundo()
-//   }
-// }
 
 // ---------------------------------------------------------------------------
 // Teclas: guardam quais direções estão seguradas
@@ -370,13 +400,9 @@ pub fn tick(estado: Estado) -> Estado {
         |> list.map(move_objeto)
         |> list.filter(ainda_visivel)
       let tique = tique + 1
-      case tique % intervalo_spawn == 0 {
-        True -> {
-          let #(orb, seed) = gera_orb(seed)
-          Jogando(jogadores, tique, seed, [orb, ..objetos])
-        }
-        False -> Jogando(jogadores, tique, seed, objetos)
-      }
+      let #(objetos, seed) = gera_a_cada(intervalo_ast, tique, seed, objetos, gera_ast)
+      let #(objetos, seed) = gera_a_cada(intervalo_spawn, tique, seed, objetos, gera_orb)
+      Jogando(jogadores, tique, seed, objetos)
     }
     _ -> estado
   }
