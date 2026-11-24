@@ -115,7 +115,7 @@ pub type Estado {
     objetos: List(Objeto),
   )
   // Resultado
-  FimDeJogo(status: List(Jogador))
+  FimDeJogo(status: List(Jogador), seed: Int)
 }
 
 // Teclas que o jogador está segurando agora
@@ -191,6 +191,15 @@ fn inicial(jogadores: List(Player)) -> Estado {
     jogadores: list.map(jogadores, novo_jogador),
     tique: 0,
     seed: 12_345,
+    objetos: [],
+  )
+}
+
+pub fn recomeca(jogadores: List(Jogador), seed: Int) -> Estado{
+  Jogando(
+    jogadores: list.map(jogadores, fn(j) {novo_jogador(j.jogador)}),
+    tique: 0,
+    seed: proximo(seed),
     objetos: [],
   )
 }
@@ -417,7 +426,7 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image {
       |> com_hud(jogadores)
       |> com_aviso_de_morte(jogadores, player)
     }
-    FimDeJogo(jogadores) -> tela_fim(jogadores)
+    FimDeJogo(jogadores, _) -> tela_fim(jogadores)
     _ -> fundo()
   }
 }
@@ -433,7 +442,7 @@ fn com_aviso_de_morte(
     True -> {
       let aviso =
         image.text("Você morreu", 36, fill.white)
-        |> image.above(texto("Aguardando o outro jogador temrinar..."))
+        |> image.above(texto("Aguardando o outro jogador terminar..."))
       image.place_imagef(
         cena,
         int.to_float(largura_tela) /. 2.0,
@@ -455,6 +464,8 @@ fn tela_fim(jogadores: List(Jogador)) -> image.Image{
   let conteudo = 
     image.text("Fim de jogo", 40, fill.white)
     |> image.above(placar)
+    |> image.above(image.rectangle(1, 20, fill.none))
+    |> image.above(texto("Pressione Enter para jogar novamente"))
   image.place_imagef(
     fundo(),
     int.to_float(largura_tela) /. 2.0,
@@ -520,7 +531,10 @@ pub fn tecla_pressionada(
   player: Player,
   evento: key.Event,
 ) -> Estado {
-  muda_tecla(estado, player, evento, True)
+  case estado, evento{
+    FimDeJogo(jogadores, seed), key.Enter -> recomeca(jogadores, seed)
+    _, _ -> muda_tecla(estado, player, evento, True)
+  }
 }
 
 pub fn tecla_solta(estado: Estado, player: Player, evento: key.Event) -> Estado {
@@ -892,7 +906,7 @@ pub fn tick(estado: Estado) -> Estado {
 
       case list.any(jogadores, vivo){
         True -> Jogando(jogadores, tique + 1, seed, objetos_finais)
-        False -> FimDeJogo(jogadores)
+        False -> FimDeJogo(jogadores, seed)
       }
     }
     _ -> estado
