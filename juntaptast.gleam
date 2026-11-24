@@ -7,6 +7,8 @@ import sgleam/image
 import sgleam/key
 import sgleam/mworld.{type Player}
 import sgleam/style
+import sgleam/xplace
+import sgleam/yplace
 
 const largura_tela = 800
 
@@ -58,6 +60,17 @@ const largura_destroco = 15
 // pixels por tick que o asteroide desce (maior que o 'deslocamento' do jogador)
 const velocidade_ast = 7
 
+// Cada posição é uma vida: True = disponível, False = perdida
+const vidas_iniciais = [True, True, True]
+
+// distância do HUD até as bordas da tela
+const margem_hud = 10
+
+const tamanho_texto = 16
+
+const raio_vida = 7
+
+
 
 // ---------------------------------------------------------------------------
 // Tipos (os do trab(1).gleam)
@@ -90,7 +103,7 @@ pub type Jogador {
   Jogador(
     jogador: Player,
     pos: Vetor,
-    vida: Int,
+    vidas: List(Bool),
     pontos: Int,
     recarga: Int,
     objetos: List(Objeto),
@@ -126,7 +139,7 @@ fn novo_jogador(jogador: Player) -> Jogador {
   Jogador(
     jogador: jogador,
     pos: Vetor(int.to_float(q_x), int.to_float(q_y)),
-    vida: 100,
+    vidas: vidas_iniciais,
     pontos: 0,
     recarga: 0,
     objetos: [],
@@ -209,6 +222,74 @@ fn gera_ast(seed: Int) -> #(Objeto, Int) {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// HUD: nome, pontos e vidas de cada jogador
+// Estas funções só LEEM os dados do Jogador (nome, pontos, vidas) e montam
+// imagens. Quem altera vidas e pontos é a lógica do jogo, não o desenho.
+// ---------------------------------------------------------------------------
+
+fn espaco() -> image.Image {
+  image.rectangle(4, 1, fill.none)
+}
+
+// Uma vida: verde se disponível (True), cinza se perdida (False)
+fn imagem_vida(disponivel: Bool) -> image.Image {
+  case disponivel {
+    True -> image.circle(raio_vida, fill.green)
+    False -> image.circle(raio_vida, fill.dimgray)
+  }
+}
+
+// Uma bolinha por posição da lista, na mesma ordem
+fn imagem_vidas(vidas: List(Bool)) -> image.Image {
+  list.fold(vidas, image.rectangle(1, 1, fill.none), fn(acc, disponivel) {
+    acc
+    |> image.beside(espaco())
+    |> image.beside(imagem_vida(disponivel))
+  })
+}
+
+fn texto(conteudo: String) -> image.Image {
+  image.text(conteudo, tamanho_texto, fill.white)
+}
+
+// Bloco de um jogador: nome, pontos e vidas, alinhados à esquerda
+fn imagem_hud(j: Jogador) -> image.Image {
+  texto(mworld.player_nickname(j.jogador))
+  |> image.above_align(xplace.Left, texto("Pontos: " <> int.to_string(j.pontos)))
+  |> image.above_align(xplace.Left, imagem_vidas(j.vidas))
+}
+
+// Jogador 1 no canto superior esquerdo, os demais no superior direito
+fn posiciona_hud(
+  img: image.Image,
+  hud: image.Image,
+  indice: Int,
+) -> image.Image {
+  let topo = int.to_float(margem_hud)
+  case indice {
+    1 ->
+      image.place_image_alignf(img, topo, topo, xplace.Left, yplace.Top, hud)
+    _ ->
+      image.place_image_alignf(
+        img,
+        int.to_float(largura_tela - margem_hud),
+        topo,
+        xplace.Right,
+        yplace.Top,
+        hud,
+      )
+  }
+}
+
+fn com_hud(base: image.Image, jogadores: List(Jogador)) -> image.Image {
+  list.fold(jogadores, base, fn(img, j) {
+    posiciona_hud(img, imagem_hud(j), mworld.player_index(j.jogador))
+  })
+}
+
+
 // ---------------------------------------------------------------------------
 // Desenho
 // ---------------------------------------------------------------------------
@@ -264,8 +345,10 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image{
         list.fold(outros, com_objetos(fundo(), objetos), fn(cena, c){
           desenha_nave(cena, c, opacidade_f)
         })
+        
         list.fold(meus, cena, fn(cena, c) {desenha_nave(cena, c, 1.0)})
-    }
+        |> com_hud(jogadores)
+    }   
     _ -> fundo()
   }
 }
