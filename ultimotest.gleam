@@ -414,7 +414,7 @@ pub fn tick(estado: Estado) -> Estado {
 
 pub fn smain() {
   mworld.create_from(
-    fn(_, jogadores) { inicial(jogadores) },min: 2, amax: 2,
+    fn(_, jogadores) { inicial(jogadores) },min: 2, max: 2,
     to_image: desenhar,
   )
   |> mworld.on_key_down(tecla_pressionada)

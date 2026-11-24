@@ -302,7 +302,7 @@ fn atualiza_entrada(
   evento: key.Event,
   valor: Bool,
 ) -> Entrada {
-  case #(indice, evento) {
+  case  #(indice, evento) {
     #(1, key.Char("w")) | #(1, key.Char("W")) -> Entrada(..e, cima: valor)
     #(1, key.Char("s")) | #(1, key.Char("S")) -> Entrada(..e, baixo: valor)
     #(1, key.Char("a")) | #(1, key.Char("A")) -> Entrada(..e, esquerda: valor)
@@ -315,23 +315,14 @@ fn atualiza_entrada(
   }
 }
 
-fn muda_tecla(
-  estado: Estado,
-  player: Player,
-  evento: key.Event,
-  valor: Bool,
-) -> Estado {
+fn muda_tecla(estado: Estado, player: Player, evento: key.Event, valor: Bool) -> Estado {
   case estado {
     Jogando(jogadores, tique, seed, objetos) -> {
       let indice = mworld.player_index(player)
       let jogadores =
         list.map(jogadores, fn(c) {
           case eh_do_jogador(c, player) {
-            True ->
-              Jogador(
-                ..c,
-                entrada: atualiza_entrada(c.entrada, indice, evento, valor),
-              )
+            True -> Jogador(..c, entrada: atualiza_entrada(c.entrada, indice, evento, valor))
             False -> c
           }
         })
@@ -447,4 +438,4 @@ pub fn smain() {
   |> mworld.on_key_down(tecla_pressionada)
   |> mworld.on_key_up(tecla_solta)
   |> mworld.on_tick(tick)
-}
+}       
