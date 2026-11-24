@@ -12,41 +12,30 @@ const largura_tela = 800
 
 const altura_tela = 600
 
-// limite para que quando a nave encoste na borda ela não fique pela metade
 const margem = 20.0
 
-// pixels por tick (o mundo roda a 28 ticks por segundo por padrão)
 const deslocamento = 5
 
 const q_x = 400
 
 const q_y = 300
 
-// opacidade do outro jogador na tela de cada jogador
-
 const opacidade_f = 0.35 
 
-// 1 / raiz de 2: evita que a diagonal seja mais rápida que as outras direções
 const diagonal = 0.7
 
-// um orbe novo a cada 15 segundos (15 * 28 ticks por segundo)
-const intervalo_spawn = 420
+const intervalo_spawn 
 
-// borda esquerda/direita para o x do orbe (Int). A `margem` Float acima é da nave
 const margem_orb = 20
 
 const raio_orb = 10
 
-// y fixo onde todo orbe nasce: logo acima da tela (use 0.0 para nascer na borda)
 const y_inicial = -10.0
 
-// pixels por tick que o orbe desce (menor que o `deslocamento` do jogador)
 const velocidade_orb = 2.0
 
-// um asteroide novo a cada 0.5 segundos (0.5 * 28 ticks por segundo)
 const intervalo_ast = 14
 
-// borda esquerda/direita para o x do asteroide (Int)
 const margem_ast = 20
 
 const altura_geodo = 20
@@ -55,7 +44,6 @@ const largura_geodo = 20
 const altura_destroco = 25
 const largura_destroco = 15
 
-// pixels por tick que o asteroide desce (maior que o 'deslocamento' do jogador)
 const velocidade_ast = 7
 
 
@@ -64,39 +52,25 @@ const velocidade_ast = 7
 // ---------------------------------------------------------------------------
 
 pub type Vetor {
+
   Vetor(x: Float, y: Float)
 }
 
 pub type Estado {
-  // Abertura
+  
   Lobby(jogadores: List(Player), segundos: Option(Int))
-  // Partida
-  Jogando(
-    jogadores: List(Jogador),
-    tique: Int,
-    seed: Int,
-    objetos: List(Objeto),
-  )
-  // Resultado
+  Jogando(jogadores: List(Jogador), tique: Int, seed: Int, objetos: List(Objeto))
   FimDeJogo(status: List(Jogador))
+
 }
 
-// Teclas de direção que o jogador está segurando agora
 pub type Entrada {
   Entrada(cima: Bool, baixo: Bool, esquerda: Bool, direita: Bool)
 }
 
 pub type Jogador {
-  Jogador(
-    jogador: Player,
-    pos: Vetor,
-    vida: Int,
-    pontos: Int,
-    recarga: Int,
-    objetos: List(Objeto),
-    tiros: List(Tiro),
-    // novos: teclas seguradas e ângulo do triângulo
-    // (graus, sentido anti-horário; 0 = apontando para cima)
+
+  Jogador( jogador: Player, pos: Vetor, vida: Int, pontos: Int, recarga: Int, objetos: List(Objeto), tiros: List(Tiro),
     entrada: Entrada,
     angulo: Int,
   )
@@ -136,7 +110,7 @@ fn novo_jogador(jogador: Player) -> Jogador {
   )
 }
 
-// A seed não pode ser 0 (o gerador ficaria preso em 0)
+
 fn inicial(jogadores: List(Player)) -> Estado {
   Jogando(
     jogadores: list.map(jogadores, novo_jogador),
@@ -166,6 +140,7 @@ fn gera_a_cada(intervalo: Int, tique: Int, seed: Int, objetos: List(Objeto), ger
 
 // Devolve um orbe verde ou vermelho com x aleatório, y fixo no alto e descendo,
 // mais a nova seed
+
 fn gera_orb(seed: Int) -> #(Objeto, Int) {
   let s1 = proximo(seed)
   let s2 = proximo(s1)
@@ -181,6 +156,7 @@ fn gera_orb(seed: Int) -> #(Objeto, Int) {
 }
 
 // Os orbes não colidem com a borda: atravessam a tela e somem depois de sair
+
 fn move_objeto(o: Objeto) -> Objeto {
   Objeto(..o, pos: Vetor(o.pos.x +. o.vel.x, o.pos.y +. o.vel.y))
 }
@@ -207,7 +183,6 @@ fn gera_ast(seed: Int) -> #(Objeto, Int) {
     s2,
   )
 }
-
 
 // ---------------------------------------------------------------------------
 // Desenho
@@ -275,6 +250,7 @@ pub fn desenhar(estado: Estado, player: Player) -> image.Image{
 // ---------------------------------------------------------------------------
 
 // Jogador 1: W A S D. Jogador 2: W A S D.
+
 fn atualiza_entrada(
   e: Entrada,
   indice: Int,
@@ -351,6 +327,7 @@ fn eixo(menos: Bool, mais: Bool) -> Int {
 
 // Ângulo anti-horário (graus) do triângulo, que por padrão aponta para cima.
 // sx: -1 esquerda, 1 direita. sy: -1 cima, 1 baixo.
+
 fn angulo_da_direcao(sx: Int, sy: Int) -> Int {
   case sx, sy {
     0, -1 -> 0
@@ -369,21 +346,19 @@ fn passo(c: Jogador) -> Jogador {
   let sx = eixo(c.entrada.esquerda, c.entrada.direita)
   let sy = eixo(c.entrada.cima, c.entrada.baixo)
   case sx == 0 && sy == 0 {
+
     // parado: mantém posição e a última orientação
+
     True -> c
     False -> {
-      let d = int.to_float(deslocamento)
+      let d = int.to_float(deslocamento)  
       let velocidade = case sx != 0 && sy != 0 {
         True -> d *. diagonal
         False -> d
       }
       let x = c.pos.x +. int.to_float(sx) *. velocidade
       let y = c.pos.y +. int.to_float(sy) *. velocidade
-      Jogador(
-        ..c,
-        pos: Vetor(
-          limita(x, margem, int.to_float(largura_tela) -. margem),
-          limita(y, margem, int.to_float(altura_tela) -. margem),
+      Jogador(..c, pos: Vetor (limita(x, margem, int.to_float(largura_tela) -. margem), limita(y, margem, int.to_float(altura_tela) -. margem),
         ),
         angulo: angulo_da_direcao(sx, sy),
       )
@@ -413,11 +388,12 @@ pub fn tick(estado: Estado) -> Estado {
 // ---------------------------------------------------------------------------
 
 pub fn smain() {
+
   mworld.create_from(
-    fn(_, jogadores) { inicial(jogadores) },min: 2, max: 2,
-    to_image: desenhar,
-  )
+
+    fn(_, jogadores) { inicial(jogadores) },min: 2, max: 2, pimage: desenhar,)
+
   |> mworld.on_key_down(tecla_pressionada)
   |> mworld.on_key_up(tecla_solta)
-  |> mworld.on_tick(tick)
-}
+  |> mworld.on_tick(tick) 
+
